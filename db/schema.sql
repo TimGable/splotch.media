@@ -228,6 +228,25 @@ CREATE TABLE IF NOT EXISTS media_comments (
 
 CREATE INDEX IF NOT EXISTS idx_media_comments_item ON media_comments (media_item_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  actor_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  media_item_id UUID REFERENCES media_items(id) ON DELETE CASCADE,
+  comment_id UUID REFERENCES media_comments(id) ON DELETE CASCADE,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT notifications_type_check CHECK (type IN ('follow', 'like', 'comment'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created
+  ON notifications (recipient_user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_unread
+  ON notifications (recipient_user_id, read_at, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS play_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   media_item_id UUID NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Upload, X } from "lucide-react";
+import { ImageCropModal } from "./image-crop-modal";
+import { ViewportPortal } from "./viewport-portal";
+import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
 
 const ACCEPT_BY_KIND = {
   music: "audio/*",
@@ -21,10 +24,10 @@ const MUSIC_RELEASE_TYPE_OPTIONS = [
 ];
 
 const VISIBILITY_OPTIONS = [
-  { value: "private", label: "private" },
-  { value: "invite_only", label: "invite only" },
-  { value: "unlisted", label: "unlisted" },
   { value: "public", label: "public" },
+  { value: "unlisted", label: "unlisted" },
+  { value: "invite_only", label: "invite only" },
+  { value: "private", label: "private" },
 ];
 
 const MAX_TRACKS_PER_RELEASE = 15;
@@ -41,11 +44,13 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [releaseType, setReleaseType] = useState("single");
-  const [visibility, setVisibility] = useState("invite_only");
+  const [visibility, setVisibility] = useState("public");
   const [file, setFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [trackTitles, setTrackTitles] = useState([]);
   const [coverArt, setCoverArt] = useState(null);
+  const [coverArtDraft, setCoverArtDraft] = useState(null);
+  const [coverArtPreviewUrl, setCoverArtPreviewUrl] = useState("");
   const [error, setError] = useState("");
 
   const itemLabel = useMemo(() => LABEL_BY_KIND[mediaKind] || "file", [mediaKind]);
@@ -57,6 +62,20 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
       setTrackTitles([]);
     }
   }, [isMultiTrackMusic]);
+
+  useEffect(() => {
+    if (!coverArt) {
+      setCoverArtPreviewUrl("");
+      return undefined;
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(coverArt);
+    setCoverArtPreviewUrl(nextPreviewUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextPreviewUrl);
+    };
+  }, [coverArt]);
 
   const handleMusicFileSelection = (nextFiles) => {
     const limitedFiles = nextFiles.slice(0, MAX_TRACKS_PER_RELEASE);
@@ -126,6 +145,7 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
   };
 
   return (
+    <ViewportPortal>
     <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
       initial={{ opacity: 0 }}
@@ -139,10 +159,8 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
     >
       <motion.div
         className="w-full max-w-xl border border-white/20 bg-black p-6 md:p-8"
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 24, scale: 0.98 }}
-        transition={{ duration: 0.2 }}
+        {...SOFT_PANEL_REVEAL}
+        transition={PAGE_TRANSITION}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-6 flex items-start justify-between gap-4">
@@ -152,15 +170,17 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
               Add a {mediaKind} file and create the first metadata record for this item.
             </p>
           </div>
-          <button
+          <motion.button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
             className="border border-white/20 p-2 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
             aria-label="Close upload modal"
+            whileHover={SOFT_BUTTON_HOVER}
+            whileTap={SOFT_BUTTON_TAP}
           >
             <X className="h-4 w-4" />
-          </button>
+          </motion.button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -233,9 +253,21 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
                   accept="image/*"
                   className="hidden"
                   disabled={isSubmitting}
-                  onChange={(event) => setCoverArt(event.target.files?.[0] ?? null)}
+                  onChange={(event) => setCoverArtDraft(event.target.files?.[0] ?? null)}
                 />
               </label>
+              {coverArtPreviewUrl && (
+                <div className="mt-3 overflow-hidden border border-white/15 bg-white/[0.03] p-3">
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                    cover preview
+                  </div>
+                  <img
+                    src={coverArtPreviewUrl}
+                    alt="Album art preview"
+                    className="aspect-square w-full max-w-[12rem] object-cover"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -339,24 +371,44 @@ export function UploadContentModal({ mediaKind, isSubmitting, onClose, onSubmit 
           )}
 
           <div className="flex gap-3">
-            <button
+            <motion.button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
               className="flex-1 border border-white/20 px-4 py-3 text-gray-300 transition-colors hover:border-white/40 hover:text-white disabled:opacity-50"
+              whileHover={SOFT_BUTTON_HOVER}
+              whileTap={SOFT_BUTTON_TAP}
             >
               cancel
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               type="submit"
               disabled={isSubmitting}
               className="flex-1 border border-white/40 px-4 py-3 transition-colors hover:border-white/60 hover:bg-white/10 disabled:opacity-50"
+              whileHover={SOFT_BUTTON_HOVER}
+              whileTap={SOFT_BUTTON_TAP}
             >
               {isSubmitting ? "uploading..." : `upload ${itemLabel}`}
-            </button>
+            </motion.button>
           </div>
         </form>
       </motion.div>
+
+      {coverArtDraft ? (
+        <ImageCropModal
+          file={coverArtDraft}
+          title="crop album art"
+          description="Position the image inside the square frame. This fixed crop becomes the release cover everywhere in the archive."
+          confirmLabel="use cover art"
+          outputSize={1400}
+          onClose={() => setCoverArtDraft(null)}
+          onConfirm={async (croppedFile) => {
+            setCoverArt(croppedFile);
+            setCoverArtDraft(null);
+          }}
+        />
+      ) : null}
     </motion.div>
+    </ViewportPortal>
   );
 }

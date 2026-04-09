@@ -4,6 +4,10 @@ import {
   ensureProfile,
   getAuthContext,
 } from "@/lib/supabase/app-user";
+import {
+  createAppNotification,
+  deleteAppNotification,
+} from "@/lib/notifications/app-notifications";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 async function buildFollowState(
@@ -126,6 +130,16 @@ export async function POST(
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
+    try {
+      await createAppNotification({
+        recipientUserId: artistUserId,
+        actorUserId: userId,
+        type: "follow",
+      });
+    } catch (notificationError) {
+      console.error("Failed to create follow notification:", notificationError);
+    }
+
     const state = await buildFollowState(supabase, userId, artistUserId);
     return NextResponse.json(state);
   } catch (error) {
@@ -157,6 +171,16 @@ export async function DELETE(
 
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+
+    try {
+      await deleteAppNotification({
+        recipientUserId: artistUserId,
+        actorUserId: userId,
+        type: "follow",
+      });
+    } catch (notificationError) {
+      console.error("Failed to delete follow notification:", notificationError);
     }
 
     const state = await buildFollowState(supabase, userId, artistUserId);

@@ -1,14 +1,22 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Edit2, Ellipsis, ListPlus, Music2, Pause, Play, Share2 } from "lucide-react";
+import { Check, Copy, Edit2, Ellipsis, Heart, ListPlus, MessageCircle, Music2, Pause, Play, Share2 } from "lucide-react";
 import { Waveform } from "./waveform";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  PAGE_TRANSITION,
+  SOFT_BUTTON_HOVER,
+  SOFT_BUTTON_TAP,
+  SOFT_CARD_HOVER,
+} from "@/lib/motion";
 
 function hashString(value) {
   let hash = 0;
@@ -44,6 +52,11 @@ export function MusicReleasePlayer({
   onAddToQueue,
   onShare,
   onEdit,
+  subtitle,
+  onSubtitleClick,
+  onToggleLike,
+  onOpenComments,
+  isLikePending,
   currentTime,
   duration,
   onSeek,
@@ -51,11 +64,23 @@ export function MusicReleasePlayer({
   formatUploadDate,
   formatReleaseType,
 }) {
+  const [copiedShareUrl, setCopiedShareUrl] = useState("");
+  const copiedShareTimeoutRef = useRef(null);
   const waveformData = useMemo(
     () => buildWaveformData(`${item.id}:${item.asset?.fileName || item.title}`),
     [item.asset?.fileName, item.id, item.title],
   );
   const progress = duration > 0 ? currentTime / duration : 0;
+  const hasActions = Boolean(onAddToQueue || onShare);
+  const shareUrl = onShare ? onShare(item) : "";
+
+  useEffect(() => {
+    return () => {
+      if (copiedShareTimeoutRef.current) {
+        window.clearTimeout(copiedShareTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds) || seconds < 0) {
@@ -67,26 +92,62 @@ export function MusicReleasePlayer({
     return `${minutes}:${remainder.toString().padStart(2, "0")}`;
   };
 
-  return (
-    <div className="overflow-hidden border border-white/20 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
-      <div className="flex flex-col md:flex-row">
-        <div className="relative aspect-square w-full overflow-hidden border-b border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] md:w-48 md:border-b-0 md:border-r">
-          {item.coverAsset?.url ? (
-            <img
-              src={item.coverAsset.url}
-              alt={item.title}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))]">
-              <Music2 className="h-14 w-14 text-white/40" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.02),rgba(0,0,0,0.2))]" />
-        </div>
+  const handleCopyShareUrl = async () => {
+    if (!shareUrl) {
+      return;
+    }
 
-        <div className="flex-1 p-5 md:p-6">
-          <div className="mb-5 flex items-start justify-between gap-4">
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedShareUrl(item.id);
+      if (copiedShareTimeoutRef.current) {
+        window.clearTimeout(copiedShareTimeoutRef.current);
+      }
+      copiedShareTimeoutRef.current = window.setTimeout(() => {
+        setCopiedShareUrl("");
+      }, 1600);
+    } catch {
+      setCopiedShareUrl("");
+    }
+  };
+
+  return (
+    <motion.div
+      className="overflow-hidden border border-white/20 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]"
+      whileHover={SOFT_CARD_HOVER}
+      transition={PAGE_TRANSITION}
+    >
+      <div className="p-4 md:p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-5">
+          <motion.button
+            type="button"
+            onClick={() => onOpen(item)}
+            className="relative mx-auto aspect-square w-32 flex-shrink-0 overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] text-left transition-opacity hover:opacity-95 md:mx-0 md:h-40 md:w-40"
+            whileHover={SOFT_CARD_HOVER}
+            whileTap={SOFT_BUTTON_TAP}
+          >
+            {item.coverAsset?.url ? (
+              <img
+                src={item.coverAsset.url}
+                alt={item.title}
+                className="h-full w-full object-cover object-center"
+                style={{
+                  WebkitMaskImage:
+                    "radial-gradient(circle at center, black 68%, rgba(0,0,0,0.92) 78%, transparent 100%)",
+                  maskImage:
+                    "radial-gradient(circle at center, black 68%, rgba(0,0,0,0.92) 78%, transparent 100%)",
+                }}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))]">
+                <Music2 className="h-14 w-14 text-white/40" />
+              </div>
+            )}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_62%,rgba(0,0,0,0.18)_100%)]" />
+          </motion.button>
+
+          <div className="min-w-0 flex-1">
+          <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <div className="mb-2 flex flex-wrap gap-2">
                 {item.releaseType && (
@@ -98,66 +159,112 @@ export function MusicReleasePlayer({
                   {item.visibility.replace("_", " ")}
                 </span>
               </div>
-              <button
+              <motion.button
                 type="button"
                 onClick={() => onOpen(item)}
-                className="text-left text-xl leading-tight transition-colors hover:text-gray-300"
+                className="cursor-pointer text-left text-lg leading-tight transition-colors hover:text-gray-300"
+                whileHover={SOFT_BUTTON_HOVER}
+                whileTap={SOFT_BUTTON_TAP}
               >
                 {item.title}
-              </button>
+              </motion.button>
+              {subtitle ? (
+                onSubtitleClick ? (
+                  <motion.button
+                    type="button"
+                    onClick={() => onSubtitleClick(item)}
+                    className="mt-1 cursor-pointer text-left text-sm uppercase tracking-[0.18em] text-gray-500 transition-colors hover:text-gray-300"
+                    whileHover={SOFT_BUTTON_HOVER}
+                    whileTap={SOFT_BUTTON_TAP}
+                  >
+                    {subtitle}
+                  </motion.button>
+                ) : (
+                  <p className="mt-1 text-sm uppercase tracking-[0.18em] text-gray-500">{subtitle}</p>
+                )
+              ) : null}
               {item.description && (
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">{item.description}</p>
               )}
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-10 w-10 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white"
-                  aria-label={`Open track options for ${item.title}`}
+            {hasActions ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-10 w-10 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+                    aria-label={`Open track options for ${item.title}`}
+                  >
+                    <Ellipsis className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="min-w-[13.5rem] border-white/15 bg-black text-white"
                 >
-                  <Ellipsis className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="border-white/15 bg-black text-white"
-              >
-                <DropdownMenuItem onClick={() => onAddToQueue(item)} className="text-white focus:bg-white/10 focus:text-white">
-                  <ListPlus className="h-4 w-4 text-gray-400" />
-                  <span>add to queue</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onShare(item)} className="text-white focus:bg-white/10 focus:text-white">
-                  <Share2 className="h-4 w-4 text-gray-400" />
-                  <span>share track</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {onAddToQueue && (
+                    <DropdownMenuItem
+                      onClick={() => onAddToQueue(item)}
+                      className="gap-2.5 whitespace-nowrap px-3 py-2 text-white focus:bg-white/10 focus:text-white"
+                    >
+                      <ListPlus className="h-4 w-4 text-gray-400" />
+                      <span>add to queue</span>
+                    </DropdownMenuItem>
+                  )}
+                  {onShare && shareUrl ? (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="gap-2.5 whitespace-nowrap px-3 py-2 text-white focus:bg-white/10 focus:text-white">
+                        <Share2 className="h-4 w-4 text-gray-400" />
+                        <span>share track</span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-[min(24rem,calc(100vw-3rem))] border-white/15 bg-black text-white">
+                        <div className="space-y-3 p-2">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">post url</p>
+                          <div className="border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs leading-relaxed text-gray-300">
+                            <span className="break-all">{shareUrl}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCopyShareUrl}
+                            className="inline-flex w-full items-center justify-center gap-2 border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.18em] text-gray-300 transition-colors hover:border-white/40 hover:text-white"
+                          >
+                            {copiedShareUrl === item.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                            <span>{copiedShareUrl === item.id ? "copied" : "copy link"}</span>
+                          </button>
+                        </div>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </div>
 
-          <div className="grid gap-5">
-            <div className="flex items-center gap-4">
+          <div className="grid gap-4">
+            <div className="flex items-center gap-3">
               <motion.button
                 type="button"
                 onClick={() => onPlayPause(item)}
                 disabled={!item.asset?.url}
-                className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.03] text-white transition-transform hover:scale-[1.03] hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
-                whileTap={{ scale: 0.94 }}
+                className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.03] text-white transition-transform hover:scale-[1.03] hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                whileHover={SOFT_BUTTON_HOVER}
+                whileTap={SOFT_BUTTON_TAP}
               >
                 {isPlaying && isActive ? (
-                  <Pause className="h-5 w-5" />
+                  <Pause className="h-4.5 w-4.5" />
                 ) : (
-                  <Play className="ml-0.5 h-5 w-5" />
+                  <Play className="ml-0.5 h-4.5 w-4.5" />
                 )}
               </motion.button>
 
               <div className="min-w-0 flex-1">
-                <div className="relative mb-2 overflow-hidden border border-white/10 bg-white/[0.02] px-3 py-3">
+                <div className="relative mb-2 overflow-hidden border border-white/10 bg-white/[0.02] px-3 py-2.5">
                   <Waveform
                     data={waveformData}
+                    audioUrl={item.asset?.url}
                     isPlaying={isPlaying && isActive}
-                    height={52}
+                    height={44}
                     progress={isActive ? progress : 0}
                     currentTime={isActive ? currentTime : 0}
                     duration={isActive ? duration : 0}
@@ -167,31 +274,73 @@ export function MusicReleasePlayer({
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-gray-500">
-                  <span>{isActive ? formatTime(currentTime) : "ready to play"}</span>
+                  <span>{isActive ? formatTime(currentTime) : ""}</span>
                   <span>{isActive ? formatTime(duration) : item.asset?.mimeType?.replace("/", " / ") || "audio"}</span>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
                 <span>Uploaded {formatUploadDate(item.createdAt)}</span>
                 {item.asset?.fileName && <span>{item.asset.fileName}</span>}
                 {item.asset?.fileSizeBytes && <span>{formatFileSize(item.asset.fileSizeBytes)}</span>}
+                {onToggleLike ? (
+                  <motion.button
+                    type="button"
+                    onClick={() => onToggleLike(item)}
+                    disabled={isLikePending}
+                    className={`inline-flex items-center gap-1.5 transition-colors ${
+                      item.isLiked ? "text-white" : "hover:text-white"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                    whileHover={SOFT_BUTTON_HOVER}
+                    whileTap={SOFT_BUTTON_TAP}
+                  >
+                    <Heart className={`h-3.5 w-3.5 ${item.isLiked ? "fill-white text-white" : ""}`} />
+                    <span>{item.likes || 0}</span>
+                  </motion.button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Heart className="h-3.5 w-3.5" />
+                    <span>{item.likes || 0}</span>
+                  </span>
+                )}
+                {onOpenComments ? (
+                  <motion.button
+                    type="button"
+                    onClick={() => onOpenComments(item)}
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-white"
+                    whileHover={SOFT_BUTTON_HOVER}
+                    whileTap={SOFT_BUTTON_TAP}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    <span>{item.comments || 0}</span>
+                  </motion.button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    <span>{item.comments || 0}</span>
+                  </span>
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => onEdit(item)}
-                className="ml-auto inline-flex items-center gap-2 border border-white/15 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 transition-colors hover:border-white/40 hover:text-white"
-              >
-                <Edit2 className="h-4 w-4" />
-                <span>edit upload</span>
-              </button>
+              {onEdit ? (
+                <motion.button
+                  type="button"
+                  onClick={() => onEdit(item)}
+                  className="ml-auto inline-flex items-center gap-2 border border-white/15 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+                  whileHover={SOFT_BUTTON_HOVER}
+                  whileTap={SOFT_BUTTON_TAP}
+                >
+                  <Edit2 className="h-4 w-4" />
+                  <span>edit upload</span>
+                </motion.button>
+              ) : null}
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

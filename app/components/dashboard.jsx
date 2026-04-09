@@ -1,17 +1,30 @@
-import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { BrowseArtists } from "./browse-artists";
-import { ArtistProfile } from "./artist-profile";
-import { GlobalAudioPlayer } from "./global-audio-player";
 import { MyProfile } from "./my-profile";
 import { BrowseVisualArtists } from "./browse-visual-artists";
 import { BrowseVideoArtists } from "./browse-video-artists";
 import { CategorySelector } from "./category-selector";
 import { Feed } from "./feed";
-import { Menu, X } from "lucide-react";
 import { InteractiveBackground } from "./interactive-background";
 import { AdminPanel } from "./admin-panel";
+import { usePublicAudio } from "./public-audio-context";
+import { SiteNavigation } from "./site-navigation";
+import { ViewportPortal } from "./viewport-portal";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { buildPublicMediaPath, buildPublicProfilePath } from "@/lib/media-slugs";
+import {
+  consumeInitialRootView,
+  getRootViewHistorySeed,
+  rememberRootViewReturn,
+} from "@/lib/public-navigation";
+import {
+  FADE_UP_ANIMATION,
+  PAGE_TRANSITION,
+  SOFT_BUTTON_HOVER,
+  SOFT_BUTTON_TAP,
+} from "@/lib/motion";
 
 function isGeneratedUsername(username) {
   return typeof username === "string" && /_[a-f0-9]{8}$/.test(username);
@@ -23,6 +36,7 @@ function createProfileQueueEntry(item, artist) {
       id: item.id,
       title: item.title,
       audioUrl: item.asset.url,
+      slug: item.slug || "",
     },
     release: {
       id: item.id,
@@ -36,22 +50,119 @@ function createProfileQueueEntry(item, artist) {
   };
 }
 
+function createFeedQueueEntry(item) {
+  return {
+    track: {
+      id: item.id,
+      title: item.title,
+      audioUrl: item.asset?.url || "",
+      slug: item.slug || "",
+    },
+    release: {
+      id: item.id,
+      title: item.title,
+      coverArt: item.coverAsset?.url || "",
+    },
+    artist: {
+      name: item.artist?.displayName || item.artist?.username || "artist",
+      username: item.artist?.username || "",
+    },
+  };
+}
+
 export function Dashboard({ onSignOut }) {
+  const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [currentView, setCurrentView] = useState('home');
-  const [selectedArtist, setSelectedArtist] = useState(null);
-  const [currentTrack, setCurrentTrack] = useState(null);
-  const [playbackQueue, setPlaybackQueue] = useState([]);
-  const [queueIndex, setQueueIndex] = useState(-1);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.7);
-  const [isMuted, setIsMuted] = useState(false);
+  const viewHistoryRef = useRef([]);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [forceProfileSetup, setForceProfileSetup] = useState(false);
+  const [profileUsername, setProfileUsername] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+  const [profileDisplayName, setProfileDisplayName] = useState("");
+  const [profileNavigationIntent, setProfileNavigationIntent] = useState("");
+  const {
+    currentTrack,
+    playbackQueue,
+    queueIndex,
+    isPlaying,
+    currentTime,
+    duration,
+    setCurrentTrack,
+    setPlaybackQueue,
+    setQueueIndex,
+    setIsPlaying,
+    setCurrentTime,
+    setDuration,
+    seekTrack,
+    skipTrack,
+  } = usePublicAudio();
+
+  const openPublicProfile = (artist, returnView) => {
+    if (typeof window === "undefined" || !artist?.username) {
+      return;
+    }
+
+    if (returnView) {
+      rememberRootViewReturn(returnView);
+    }
+
+    router.push(buildPublicProfilePath(artist.username));
+  };
+
+  const openPublicMediaItem = (item, returnView) => {
+    if (typeof window === "undefined" || !item?.artist?.username || !item?.slug) {
+      return;
+    }
+
+    if (returnView) {
+      rememberRootViewReturn(returnView);
+    }
+
+    router.push(buildPublicMediaPath(item.artist.username, item.slug));
+  };
+
+  const navigateToView = (nextView, { recordHistory = true } = {}) => {
+    setCurrentView((current) => {
+      if (current === nextView) {
+        return current;
+      }
+
+      if (recordHistory) {
+        const currentHistory = viewHistoryRef.current;
+        if (currentHistory[currentHistory.length - 1] !== current) {
+          viewHistoryRef.current = [...currentHistory, current];
+        }
+      }
+
+      return nextView;
+    });
+  };
+
+  const goBackView = (fallbackView = "home") => {
+    setCurrentView((current) => {
+      const currentHistory = viewHistoryRef.current;
+      const previousView = currentHistory[currentHistory.length - 1];
+
+      if (!previousView) {
+        return fallbackView;
+      }
+
+      viewHistoryRef.current = currentHistory.slice(0, -1);
+      return previousView === current ? fallbackView : previousView;
+    });
+  };
+
+  useEffect(() => {
+    const initialView = consumeInitialRootView();
+    if (!initialView) {
+      return;
+    }
+
+    viewHistoryRef.current = getRootViewHistorySeed(initialView);
+    navigateToView(initialView, { recordHistory: false });
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -74,11 +185,15 @@ export function Dashboard({ onSignOut }) {
       if (!mounted) return;
 
       setIsAdmin(Boolean(payload?.profile?.isAdmin));
+      setProfileUsername(payload?.profile?.username || "");
+      setProfileAvatarUrl(payload?.profile?.avatarUrl || "");
+      setProfileDisplayName(payload?.profile?.displayName || "");
 
       const setupRequired = isGeneratedUsername(payload?.profile?.username);
       setForceProfileSetup(setupRequired);
       if (setupRequired) {
-        setCurrentView("profile");
+        viewHistoryRef.current = ["home"];
+        navigateToView("profile", { recordHistory: false });
       }
     }
 
@@ -87,20 +202,6 @@ export function Dashboard({ onSignOut }) {
       mounted = false;
     };
   }, [supabase]);
-
-  const handleArtistClick = (artist) => {
-    setSelectedArtist(artist);
-    setCurrentView('artist');
-  };
-
-  const handlePlayTrack = (track, release, artist) => {
-    setPlaybackQueue([]);
-    setQueueIndex(-1);
-    setCurrentTrack({ track, release, artist });
-    setIsPlaying(true);
-    setCurrentTime(0);
-    setDuration(0);
-  };
 
   const handlePlayProfileTrack = (item, artist, queueItems) => {
     if (!item?.asset?.url) {
@@ -231,43 +332,108 @@ export function Dashboard({ onSignOut }) {
     });
   };
 
-  const handleClosePlayer = () => {
-    setIsPlaying(false);
-    setCurrentTrack(null);
-    setPlaybackQueue([]);
-    setQueueIndex(-1);
-    setCurrentTime(0);
-    setDuration(0);
-  };
-
   const handleSeekTrack = (time, audioElement) => {
-    setCurrentTime(time);
-    if (audioElement) {
-      audioElement.currentTime = time;
-    }
-  };
-
-  const handleVolumeChange = (nextVolume) => {
-    setVolume(nextVolume);
-    if (nextVolume > 0) {
-      setIsMuted(false);
-    }
+    seekTrack(time, audioElement);
   };
 
   const handleSkipTrack = (direction) => {
-    const nextIndex = queueIndex + direction;
-    if (nextIndex < 0 || nextIndex >= playbackQueue.length) {
+    skipTrack(direction);
+  };
+
+  const handlePlayFeedTrack = (item, feedItems) => {
+    if (!item?.asset?.url) {
       return;
     }
 
-    setQueueIndex(nextIndex);
-    setCurrentTrack(playbackQueue[nextIndex]);
+    if (currentTrack?.track?.id === item.id) {
+      setIsPlaying((current) => !current);
+      return;
+    }
+
+    const queue = (feedItems || [])
+      .filter((feedItem) => feedItem?.mediaKind === "music" && feedItem?.asset?.url)
+      .map((feedItem) => createFeedQueueEntry(feedItem));
+
+    const nextQueueIndex = queue.findIndex((entry) => entry.track.id === item.id);
+    if (nextQueueIndex === -1) {
+      return;
+    }
+
+    setPlaybackQueue(queue);
+    setQueueIndex(nextQueueIndex);
+    setCurrentTrack(queue[nextQueueIndex] || null);
     setIsPlaying(true);
     setCurrentTime(0);
     setDuration(0);
   };
 
+  const handleAddFeedTrackToQueue = (item, feedItems) => {
+    if (!item?.asset?.url) {
+      return "invalid";
+    }
+
+    const nextEntry = createFeedQueueEntry(item);
+
+    if (!currentTrack) {
+      setPlaybackQueue([nextEntry]);
+      setQueueIndex(0);
+      setCurrentTrack(nextEntry);
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      return "added";
+    }
+
+    const queueSource =
+      playbackQueue.length > 0
+        ? playbackQueue
+        : (feedItems || [])
+            .filter((feedItem) => feedItem?.mediaKind === "music" && feedItem?.asset?.url)
+            .map((feedItem) => createFeedQueueEntry(feedItem));
+
+    if (queueSource.some((entry) => entry.track.id === item.id)) {
+      return "exists";
+    }
+
+    setPlaybackQueue([
+      ...(queueSource.length > 0 ? queueSource : [currentTrack]),
+      nextEntry,
+    ]);
+    return "added";
+  };
+
   const canLeaveProfileSetup = !forceProfileSetup;
+  const openOwnProfile = () => {
+    if (forceProfileSetup || !profileUsername) {
+      navigateToView("profile");
+      return;
+    }
+
+    rememberRootViewReturn(currentView);
+    router.push(buildPublicProfilePath(profileUsername));
+  };
+
+  const openOwnProfileSettings = () => {
+    if (forceProfileSetup || !profileUsername) {
+      setProfileNavigationIntent("settings");
+      navigateToView("profile");
+      return;
+    }
+
+    rememberRootViewReturn(currentView);
+    router.push(`${buildPublicProfilePath(profileUsername)}#settings`);
+  };
+
+  const openOwnProfileUpload = () => {
+    if (forceProfileSetup || !profileUsername) {
+      setProfileNavigationIntent("upload");
+      navigateToView("profile");
+      return;
+    }
+
+    rememberRootViewReturn(currentView);
+    router.push(`${buildPublicProfilePath(profileUsername)}#upload`);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
@@ -277,223 +443,94 @@ export function Dashboard({ onSignOut }) {
 
         {/* Content */}
         <div className="relative z-10">
-          {/* Navigation */}
-          <motion.nav
-            className="border-b border-white/10 bg-black/50 backdrop-blur-sm"
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 flex items-center justify-between">
-              <motion.h1
-                className="text-xl md:text-2xl tracking-wide cursor-pointer"
-                onClick={() => {
-                  if (!canLeaveProfileSetup) return;
-                  setCurrentView('home');
-                  setShowMobileMenu(false);
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                our media archive
-              </motion.h1>
-              
-              {/* Desktop Navigation */}
-              <div className="hidden lg:flex gap-8 items-center">
-                {isAdmin && (
-                  <motion.button
-                    onClick={() => {
-                      if (!canLeaveProfileSetup) return;
-                      setCurrentView('admin');
-                    }}
-                    className="text-gray-400 hover:text-white transition-colors relative group"
-                    whileHover={{ y: -2 }}
-                  >
-                    administrator page
-                    <motion.div
-                      className="absolute -bottom-1 left-0 right-0 h-px bg-white"
-                      initial={{ scaleX: 0 }}
-                      whileHover={{ scaleX: 1 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  </motion.button>
-                )}
-                <motion.button
-                    onClick={() => {
-                      if (!canLeaveProfileSetup) return;
-                      setSelectedArtist(null);
-                      setCurrentView('profile');
-                    }}
-                  className="text-gray-400 hover:text-white transition-colors relative group"
-                  whileHover={{ y: -2 }}
-                >
-                  my profile
-                  <motion.div
-                    className="absolute -bottom-1 left-0 right-0 h-px bg-white"
-                    initial={{ scaleX: 0 }}
-                    whileHover={{ scaleX: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </motion.button>
-                <motion.button
-                  onClick={() => setShowSignOutConfirm(true)}
-                  className="text-gray-400 hover:text-white transition-colors relative group"
-                  whileHover={{ y: -2 }}
-                >
-                  sign out
-                  <motion.div
-                    className="absolute -bottom-1 left-0 right-0 h-px bg-white"
-                    initial={{ scaleX: 0 }}
-                    whileHover={{ scaleX: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </motion.button>
-              </div>
-
-              {/* Mobile Menu Button */}
-              <motion.button
-                className="lg:hidden w-10 h-10 flex items-center justify-center touch-manipulation"
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                whileTap={{ scale: 0.9 }}
-              >
-                {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
-              </motion.button>
-            </div>
-
-            {/* Mobile Menu */}
-            <AnimatePresence>
-              {showMobileMenu && (
-                <motion.div
-                  className="lg:hidden border-t border-white/10 bg-black/90 backdrop-blur-lg"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                >
-                  <div className="px-4 py-4 space-y-2">
-                    {isAdmin && (
-                      <motion.button
-                        onClick={() => {
-                          if (!canLeaveProfileSetup) return;
-                          setCurrentView('admin');
-                          setShowMobileMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 transition-colors border border-white/10 hover:border-white/20 touch-manipulation"
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        administrator page
-                      </motion.button>
-                    )}
-                    <motion.button
-                      onClick={() => {
-                        setSelectedArtist(null);
-                        setCurrentView('profile');
-                        setShowMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 transition-colors border border-white/10 hover:border-white/20 touch-manipulation"
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      my profile
-                    </motion.button>
-                    <motion.button
-                      onClick={() => {
-                        setShowSignOutConfirm(true);
-                        setShowMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors border border-red-500/40 hover:border-red-500/60 touch-manipulation"
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      sign out
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.nav>
+          <SiteNavigation
+            isAdmin={isAdmin}
+            onHome={canLeaveProfileSetup ? () => navigateToView("home") : undefined}
+            onAdmin={canLeaveProfileSetup && isAdmin ? () => navigateToView("admin") : undefined}
+            onUpload={openOwnProfileUpload}
+            onAccountSettings={openOwnProfileSettings}
+            onSignOut={() => setShowSignOutConfirm(true)}
+            profileAvatarUrl={profileAvatarUrl}
+            profileDisplayName={profileDisplayName}
+            disableHome={!canLeaveProfileSetup}
+            disableProfileActions={false}
+          />
 
           {/* Main Content Area */}
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
-            {currentView === 'home' && (
+            <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
+                key={currentView}
+                initial={FADE_UP_ANIMATION.initial}
+                animate={FADE_UP_ANIMATION.animate}
+                exit={FADE_UP_ANIMATION.exit}
+                transition={PAGE_TRANSITION}
               >
+            {currentView === 'home' && (
+              <div>
                 {/* Welcome Header */}
                 <div className="text-center mb-8 md:mb-12">
                   <h2 className="text-3xl md:text-4xl mb-6">welcome</h2>
-                  
-                  {/* Browse Artists Button */}
                   <motion.button
-                  onClick={() => setCurrentView('categories')}
-                  disabled={!canLeaveProfileSetup}
-                  className="border border-white/40 px-6 md:px-8 py-3 hover:border-white/60 hover:bg-white/5 transition-all duration-300 group relative touch-manipulation inline-block"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => navigateToView('categories')}
+                    className="border border-white/40 px-5 py-3 text-sm tracking-wide transition-colors hover:border-white/60 hover:bg-white/10"
+                    whileHover={SOFT_BUTTON_HOVER}
+                    whileTap={SOFT_BUTTON_TAP}
                   >
-                    <span className="text-sm md:text-base tracking-wide">browse artists</span>
-                    <motion.div
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
-                      initial={{ scaleX: 0 }}
-                      whileHover={{ scaleX: 1 }}
-                      transition={{ duration: 0.3 }}
-                    />
+                    browse artists
                   </motion.button>
                 </div>
 
                 {/* Feed Section */}
                 <Feed 
-                  onArtistClick={(artistId) => {
-                    // TODO: Fetch artist data and navigate to their profile
-                    console.log('Navigate to artist:', artistId);
-                  }}
-                  onPlayTrack={(itemId) => {
-                    // TODO: Load and play track
-                    console.log('Play track:', itemId);
-                  }}
+                  onArtistClick={(artist) => openPublicProfile(artist, "home")}
+                  onPlayTrack={handlePlayFeedTrack}
+                  onAddToQueue={handleAddFeedTrackToQueue}
+                  onOpenItem={(item) => openPublicMediaItem(item, "home")}
+                  onOpenProfile={openOwnProfile}
+                  currentTrackId={currentTrack?.track?.id || ""}
+                  isPlaying={isPlaying}
+                  currentTime={currentTime}
+                  duration={duration}
+                  onSeekTrack={handleSeekTrack}
                 />
-              </motion.div>
+              </div>
             )}
 
             {currentView === 'categories' && (
               <CategorySelector
                 onCategorySelect={(category) => {
                   if (!canLeaveProfileSetup) return;
-                  if (category === 'music') setCurrentView('browse-music');
-                  else if (category === 'visual') setCurrentView('browse-visual');
-                  else if (category === 'video') setCurrentView('browse-video');
+                  if (category === 'music') navigateToView('browse-music');
+                  else if (category === 'visual') navigateToView('browse-visual');
+                  else if (category === 'video') navigateToView('browse-video');
                 }}
                 onBack={() => {
                   if (!canLeaveProfileSetup) return;
-                  setCurrentView('home');
+                  goBackView('home');
                 }}
               />
             )}
 
             {currentView === 'browse-music' && (
               <BrowseArtists 
-                onArtistClick={handleArtistClick}
-                onBack={() => setCurrentView('categories')}
+                onArtistClick={(artist) => openPublicProfile(artist, "browse-music")}
+                onBack={() => goBackView('categories')}
               />
             )}
 
             {currentView === 'browse-visual' && (
               <BrowseVisualArtists 
-                onArtistClick={(artist) => {
-                  // Visual artist profiles would be handled here
-                  console.log('Visual artist clicked:', artist);
-                }}
-                onBack={() => setCurrentView('categories')}
+                onArtistClick={(artist) => openPublicProfile(artist, "browse-visual")}
+                onBack={() => goBackView('categories')}
               />
             )}
 
             {currentView === 'browse-video' && (
               <BrowseVideoArtists 
-                onArtistClick={(artist) => {
-                  // Video artist profiles would be handled here
-                  console.log('Video artist clicked:', artist);
-                }}
-                onBack={() => setCurrentView('categories')}
+                onArtistClick={(artist) => openPublicProfile(artist, "browse-video")}
+                onBack={() => goBackView('categories')}
               />
             )}
 
@@ -501,7 +538,9 @@ export function Dashboard({ onSignOut }) {
               <MyProfile
                 forceSetup={forceProfileSetup}
                 onSetupComplete={() => setForceProfileSetup(false)}
-                onBack={() => setCurrentView('home')}
+                onBack={() => goBackView('home')}
+                navigationIntent={profileNavigationIntent}
+                onNavigationIntentHandled={() => setProfileNavigationIntent("")}
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
                 onPlayTrack={handlePlayProfileTrack}
@@ -515,112 +554,73 @@ export function Dashboard({ onSignOut }) {
             )}
 
             {currentView === 'admin' && isAdmin && (
-              <AdminPanel onBack={() => setCurrentView('home')} />
+              <AdminPanel onBack={() => goBackView('home')} />
             )}
-
-            {currentView === 'artist' && selectedArtist && (
-              <ArtistProfile 
-                artist={selectedArtist} 
-                onBack={() => setCurrentView('browse-music')}
-                onPlayTrack={handlePlayTrack}
-                currentTrack={currentTrack}
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                duration={duration}
-                onSeekTrack={handleSeekTrack}
-              />
-            )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* Global Audio Player */}
-        {currentTrack && (
-          <GlobalAudioPlayer
-            currentTrack={currentTrack}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            volume={volume}
-            isMuted={isMuted}
-            onPlayPause={() => setIsPlaying(!isPlaying)}
-            onTrackEnd={() => {
-              if (queueIndex >= 0 && queueIndex < playbackQueue.length - 1) {
-                handleSkipTrack(1);
-                return;
-              }
-              setIsPlaying(false);
-              setCurrentTime(0);
-            }}
-            canSkipPrevious={queueIndex > 0}
-            canSkipNext={queueIndex >= 0 && queueIndex < playbackQueue.length - 1}
-            onSkipPrevious={() => handleSkipTrack(-1)}
-            onSkipNext={() => handleSkipTrack(1)}
-            onClose={handleClosePlayer}
-            onTimeChange={setCurrentTime}
-            onDurationChange={setDuration}
-            onSeek={handleSeekTrack}
-            onVolumeChange={handleVolumeChange}
-            onMuteToggle={() => setIsMuted((current) => !current)}
-          />
-        )}
       </div>
 
       {/* Sign Out Confirmation */}
       {showSignOutConfirm && (
-        <motion.div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setShowSignOutConfirm(false)}
-        >
-          <motion.div 
-            className="bg-black border-2 border-white/20 p-10 max-w-md w-full mx-4"
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            onClick={(e) => e.stopPropagation()}
+        <ViewportPortal>
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSignOutConfirm(false)}
           >
-            <h3 className="text-2xl mb-4 tracking-wide">are you sure?</h3>
-            <p className="text-gray-400 mb-8 tracking-wide">you&apos;ll need to sign back in to access your profile</p>
-            
-            <div className="flex gap-4">
-              <motion.button
-                onClick={() => setShowSignOutConfirm(false)}
-                className="flex-1 px-6 py-4 border border-white/40 hover:border-white/60 hover:bg-white/5 transition-all duration-300 relative group"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <span className="text-base tracking-wide">cancel</span>
-                <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
-                  initial={{ scaleX: 0 }}
-                  whileHover={{ scaleX: 1 }}
-                  transition={{ duration: 0.3 }}
-                />
-              </motion.button>
-              
-              <motion.button
-                onClick={async () => {
-                  await onSignOut();
-                  setShowSignOutConfirm(false);
-                }}
-                className="flex-1 px-6 py-4 border border-red-500/60 hover:border-red-500 hover:bg-red-500/10 transition-all duration-300 relative group"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <span className="text-base tracking-wide text-red-400 group-hover:text-red-300">sign out</span>
-                <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500"
-                  initial={{ scaleX: 0 }}
-                  whileHover={{ scaleX: 1 }}
-                  transition={{ duration: 0.3 }}
-                />
-              </motion.button>
-            </div>
+            <motion.div
+              className="bg-black border-2 border-white/20 p-10 max-w-md w-full mx-4"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={PAGE_TRANSITION}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-2xl mb-4 tracking-wide">are you sure?</h3>
+              <p className="text-gray-400 mb-8 tracking-wide">you&apos;ll need to sign back in to access your profile</p>
+
+              <div className="flex gap-4">
+                <motion.button
+                  onClick={() => setShowSignOutConfirm(false)}
+                  className="flex-1 px-6 py-4 border border-white/40 hover:border-white/60 hover:bg-white/5 transition-all duration-300 relative group"
+                  whileHover={SOFT_BUTTON_HOVER}
+                  whileTap={SOFT_BUTTON_TAP}
+                >
+                  <span className="text-base tracking-wide">cancel</span>
+                  <motion.div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
+                    initial={{ scaleX: 0 }}
+                    whileHover={{ scaleX: 1 }}
+                    transition={PAGE_TRANSITION}
+                  />
+                </motion.button>
+
+                <motion.button
+                  onClick={async () => {
+                    await onSignOut();
+                    setShowSignOutConfirm(false);
+                  }}
+                  className="flex-1 px-6 py-4 border border-red-500/60 hover:border-red-500 hover:bg-red-500/10 transition-all duration-300 relative group"
+                  whileHover={SOFT_BUTTON_HOVER}
+                  whileTap={SOFT_BUTTON_TAP}
+                >
+                  <span className="text-base tracking-wide text-red-400 group-hover:text-red-300">sign out</span>
+                  <motion.div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500"
+                    initial={{ scaleX: 0 }}
+                    whileHover={{ scaleX: 1 }}
+                    transition={PAGE_TRANSITION}
+                  />
+                </motion.button>
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
+        </ViewportPortal>
       )}
     </div>
   );

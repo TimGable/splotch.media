@@ -39,6 +39,49 @@ async function getAuthContext(request: Request): Promise<AuthContext | null> {
 async function ensureAppUser(authUserId: string, email: string) {
   const supabase = createSupabaseServiceRoleClient();
 
+  const { data: byAuthUser, error: byAuthUserError } = await supabase
+    .from("users")
+    .select("id, email, is_admin")
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+
+  if (byAuthUserError) {
+    throw new Error(byAuthUserError.message);
+  }
+
+  if (byAuthUser?.id) {
+    if (byAuthUser.email !== email) {
+      const { data: emailOwner, error: emailOwnerError } = await supabase
+        .from("users")
+        .select("id, auth_user_id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (emailOwnerError) {
+        throw new Error(emailOwnerError.message);
+      }
+
+      if (emailOwner?.id && emailOwner.id !== byAuthUser.id) {
+        throw new Error("Email is already linked to a different auth account.");
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from("users")
+        .update({ email })
+        .eq("id", byAuthUser.id)
+        .select("id, is_admin")
+        .single();
+
+      if (updateError || !updated?.id) {
+        throw new Error(updateError?.message ?? "Failed to update app user email.");
+      }
+
+      return { userId: updated.id as string, isAdmin: Boolean(updated.is_admin) };
+    }
+
+    return { userId: byAuthUser.id as string, isAdmin: Boolean(byAuthUser.is_admin) };
+  }
+
   const { data: byEmail, error: byEmailError } = await supabase
     .from("users")
     .select("id, auth_user_id, is_admin")
@@ -77,6 +120,7 @@ async function ensureAppUser(authUserId: string, email: string) {
     .insert({
       auth_user_id: authUserId,
       email,
+      is_admin: false,
     })
     .select("id, is_admin")
     .single();

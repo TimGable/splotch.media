@@ -1,106 +1,99 @@
 import { motion } from "motion/react";
 import { Music, Palette, Video } from "lucide-react";
+import {
+  PAGE_TRANSITION,
+  SOFT_BUTTON_HOVER,
+  SOFT_BUTTON_TAP,
+  SOFT_CARD_HOVER,
+} from "@/lib/motion";
 
 export function CategorySelector({ onCategorySelect, onBack, showBackButton = true }) {
   const categories = [
     {
-      id: 'music',
-      title: 'music',
-      description: 'explore music artists',
+      id: "music",
+      title: "music",
+      description: "explore artists publishing singles, EPs, and albums",
       icon: Music,
     },
     {
-      id: 'visual',
-      title: 'visual',
-      description: 'explore visual artists',
+      id: "visual",
+      title: "visual",
+      description: "browse illustration, photography, and image-based work",
       icon: Palette,
     },
     {
-      id: 'video',
-      title: 'video',
-      description: 'explore video artists',
+      id: "video",
+      title: "video",
+      description: "move through films, motion graphics, and moving-image archives",
       icon: Video,
     },
   ];
 
   return (
-    <div>
-      {/* Back button - Top Left */}
+    <div className="mx-auto max-w-6xl">
       {showBackButton && onBack && (
         <motion.button
           onClick={onBack}
-          className="mb-8 md:mb-12 text-gray-400 hover:text-white transition-colors relative group inline-block touch-manipulation"
-          whileHover={{ x: -5 }}
-          whileTap={{ scale: 0.95 }}
+          className="mb-8 inline-block touch-manipulation text-gray-400 transition-colors hover:text-white md:mb-12"
+          whileHover={{ x: -3, ...SOFT_BUTTON_HOVER }}
+          whileTap={SOFT_BUTTON_TAP}
         >
-          <span className="inline-block">←</span>
+          <span className="inline-block" aria-hidden="true">{"\u2190"}</span>
           <span className="ml-2">back</span>
-          <motion.div
-            className="absolute -bottom-1 left-0 h-px bg-white"
-            initial={{ width: 0 }}
-            whileHover={{ width: "100%" }}
-            transition={{ duration: 0.3 }}
-          />
         </motion.button>
       )}
 
-      {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="mb-12 md:mb-16 text-center"
+        transition={PAGE_TRANSITION}
+        className="mb-12 border border-white/20 p-6 text-center md:mb-16 md:p-12"
       >
-        <h2 className="text-3xl md:text-4xl lg:text-5xl tracking-tight mb-4">browse artists</h2>
-        <p className="text-gray-400 tracking-wide text-base md:text-lg">choose a category</p>
+        <h2 className="text-3xl tracking-tight md:text-4xl lg:text-5xl">browse artists</h2>
       </motion.div>
 
-      {/* Categories Grid */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 max-w-6xl mx-auto"
+        className="grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-3 md:gap-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.6 }}
+        transition={{ ...PAGE_TRANSITION, delay: 0.08 }}
       >
         {categories.map((category, index) => {
           const Icon = category.icon;
+
           return (
             <motion.button
               key={category.id}
               onClick={() => onCategorySelect(category.id)}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 * index, duration: 0.5 }}
+              transition={{ ...PAGE_TRANSITION, delay: 0.08 * index }}
               className="group relative touch-manipulation active:scale-95"
-              whileHover={{ y: -8 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={SOFT_CARD_HOVER}
+              whileTap={SOFT_BUTTON_TAP}
             >
-              <div className="relative border border-white/10 group-hover:border-white/30 transition-all duration-300 p-8 md:p-12">
-                {/* Icon */}
+              <div className="relative border border-white/10 bg-white/[0.03] p-8 transition-all duration-300 group-hover:border-white/30 group-hover:bg-white/[0.06] md:p-12">
                 <motion.div
-                  className="mb-4 md:mb-6 flex justify-center"
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  transition={{ type: "spring", stiffness: 300 }}
+                  className="mb-4 flex justify-center md:mb-6"
+                  whileHover={{ scale: 1.04, rotate: 2 }}
+                  transition={PAGE_TRANSITION}
                 >
-                  <Icon className="w-12 h-12 md:w-16 md:h-16 text-white/80" strokeWidth={1.5} />
+                  <Icon className="h-12 w-12 text-white/80 md:h-16 md:w-16" strokeWidth={1.5} />
                 </motion.div>
 
-                {/* Title */}
-                <h3 className="text-2xl md:text-3xl tracking-wide mb-2 md:mb-3 group-hover:text-white/90 transition-colors">
+                <h3 className="mb-2 text-2xl tracking-wide transition-colors group-hover:text-white/90 md:mb-3 md:text-3xl">
                   {category.title}
                 </h3>
 
-                {/* Description */}
-                <p className="text-gray-400 text-xs md:text-sm tracking-wide">
+                <p className="text-xs tracking-wide text-gray-400 md:text-sm">
                   {category.description}
                 </p>
 
-                {/* Hover underline */}
                 <motion.div
                   className="absolute bottom-0 left-0 right-0 h-px bg-white"
                   initial={{ scaleX: 0 }}
                   whileHover={{ scaleX: 1 }}
-                  transition={{ duration: 0.3 }}
+                  transition={PAGE_TRANSITION}
                 />
               </div>
             </motion.button>

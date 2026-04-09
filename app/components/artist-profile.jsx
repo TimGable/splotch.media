@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, Play, Pause, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
+import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { Waveform } from "./waveform";
 import { ImageWithFallback } from "./figma/ImageWithFallback.tsx";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { buildPublicProfilePath } from "@/lib/media-slugs";
+
+function formatTrackCount(count) {
+  return count === 1 ? "1 track" : `${count} tracks`;
+}
 
 export function ArtistProfile({
   artist,
@@ -39,6 +44,7 @@ export function ArtistProfile({
           Authorization: `Bearer ${session.access_token}`,
         },
       });
+
       if (!response.ok || !mounted) {
         return;
       }
@@ -95,9 +101,15 @@ export function ArtistProfile({
     toggleFollow();
   };
 
-  const isTrackPlaying = (trackId) => {
-    return currentTrack?.track.id === trackId && isPlaying;
+  const openPublicProfile = () => {
+    if (typeof window === "undefined" || !artist?.username) {
+      return;
+    }
+
+    window.location.assign(buildPublicProfilePath(artist.username));
   };
+
+  const isTrackPlaying = (trackId) => currentTrack?.track?.id === trackId && isPlaying;
 
   const handleTrackClick = (track, release) => {
     onPlayTrack(track, release, artist);
@@ -117,202 +129,242 @@ export function ArtistProfile({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
     >
-      {/* Back button */}
       <motion.button
         onClick={onBack}
-        className="mb-8 text-gray-400 hover:text-white transition-colors relative group inline-block"
+        className="group relative mb-6 inline-block text-gray-400 transition-colors hover:text-white md:mb-8"
         whileHover={{ x: -5 }}
         whileTap={{ scale: 0.95 }}
       >
-        <span className="inline-block">←</span>
+        <span aria-hidden="true">{"\u2190"}</span>
         <span className="ml-2">back</span>
         <motion.div
           className="absolute -bottom-1 left-0 h-px bg-white"
           initial={{ width: 0 }}
           whileHover={{ width: "100%" }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.25 }}
         />
       </motion.button>
 
-      {/* Artist Header */}
-      <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8 mb-12">
-        <motion.div
-          className="w-32 h-32 md:w-48 md:h-48 rounded-full overflow-hidden border-2 border-white/20 flex-shrink-0"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          <ImageWithFallback
-            src={artist.avatar}
-            alt={artist.name}
-            className="w-full h-full object-cover"
-          />
-        </motion.div>
-        
-        <motion.div
-          className="flex-1 w-full"
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
-            <div>
-              <h1 className="text-3xl md:text-5xl mb-3">{artist.name}</h1>
-              
-              {/* Follower Stats */}
-              <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
-                <span>
-                  <span className="text-white font-medium">{followerCount}</span> followers
-                </span>
-                {followingCount !== undefined && (
-                  <span>
-                    <span className="text-white font-medium">{followingCount}</span> following
-                  </span>
+      <div className="mb-12 border border-white/20 p-6 md:p-10">
+        <div className="flex flex-col gap-8 xl:flex-row xl:items-start">
+          <motion.div
+            className="h-32 w-32 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/20 bg-gradient-to-br from-gray-800 to-gray-900 md:h-44 md:w-44"
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.45 }}
+          >
+            <ImageWithFallback
+              src={artist.avatar}
+              alt={artist.name}
+              className="h-full w-full object-cover"
+            />
+          </motion.div>
+
+          <motion.div
+            className="min-w-0 flex-1"
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.45 }}
+          >
+            <div className="mb-5 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0">
+                <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-gray-500">
+                  artist profile
+                </p>
+                <h1 className="text-3xl md:text-5xl">{artist.name}</h1>
+                {artist.username && (
+                  <p className="mt-2 text-sm text-gray-400 md:text-base">@{artist.username}</p>
                 )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <motion.button
+                  type="button"
+                  onClick={openPublicProfile}
+                  className="inline-flex items-center gap-2 border border-white/25 px-4 py-2.5 text-sm text-gray-300 transition-colors hover:border-white/45 hover:bg-white/[0.05] hover:text-white"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span>open public page</span>
+                  <ArrowUpRight className="h-4 w-4" />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  onClick={handleFollowToggle}
+                  className={`border px-5 py-2.5 text-sm transition-colors ${
+                    isFollowing
+                      ? "border-white/40 bg-white text-black hover:bg-white/90"
+                      : "border-white/30 bg-transparent text-white hover:border-white/50 hover:bg-white/[0.05]"
+                  }`}
+                  disabled={isUpdatingFollow}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isFollowing ? "unfollow" : "follow"}
+                </motion.button>
               </div>
             </div>
 
-            {/* Follow Button */}
-            <motion.button
-              onClick={handleFollowToggle}
-              className={`px-6 md:px-8 py-2.5 md:py-3 border transition-all duration-300 touch-manipulation ${
-                isFollowing
-                  ? 'border-white/40 bg-white text-black hover:bg-white/90'
-                  : 'border-white/40 bg-transparent hover:border-white/60 hover:bg-white/5'
-              }`}
-              disabled={isUpdatingFollow}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span className="text-sm md:text-base tracking-wide">
-                {isFollowing ? 'unfollow' : 'follow'}
-              </span>
-            </motion.button>
-          </div>
+            <div className="mb-6 grid gap-3 sm:grid-cols-3">
+              <div className="border border-white/15 bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">followers</p>
+                <p className="mt-2 text-2xl">{followerCount}</p>
+              </div>
+              <div className="border border-white/15 bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">following</p>
+                <p className="mt-2 text-2xl">{followingCount}</p>
+              </div>
+              <div className="border border-white/15 bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">releases</p>
+                <p className="mt-2 text-2xl">{artist.releases.length}</p>
+              </div>
+            </div>
 
-          <p className="text-gray-400 text-base md:text-lg leading-relaxed max-w-2xl">{artist.bio}</p>
-        </motion.div>
+            <p className="max-w-3xl text-sm leading-relaxed text-gray-300 md:text-base">
+              {artist.bio || "No bio added yet."}
+            </p>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Releases */}
-      <div className="space-y-6">
-        <h2 className="text-2xl mb-6">releases</h2>
-        
-        {artist.releases.length === 0 ? (
-          <p className="text-gray-400">no releases yet</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {artist.releases.map((release, index) => (
+      <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="mb-2 text-[11px] uppercase tracking-[0.22em] text-gray-500">discography</p>
+          <h2 className="text-2xl md:text-3xl">releases</h2>
+        </div>
+        <p className="text-sm text-gray-500">
+          Open a release to view tracks and scrub through the live waveform.
+        </p>
+      </div>
+
+      {artist.releases.length === 0 ? (
+        <div className="border border-dashed border-white/20 p-12 text-center text-gray-500">
+          no releases yet
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          {artist.releases.map((release, index) => {
+            const isExpanded = expandedRelease === release.id;
+
+            return (
               <motion.div
                 key={release.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + index * 0.1, duration: 0.4 }}
-                className="border border-white/20 overflow-hidden hover:border-white/40 transition-all duration-300"
+                transition={{ delay: 0.08 * index, duration: 0.35 }}
+                className="overflow-hidden border border-white/20 bg-white/[0.03]"
               >
-                {/* Cover Art */}
-                <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900">
-                  <ImageWithFallback
-                    src={release.coverArt}
-                    alt={release.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-4 right-4">
-                    <span className="bg-black/80 backdrop-blur-sm px-3 py-1 text-xs uppercase tracking-wider">
-                      {release.type}
-                    </span>
+                <div className="flex flex-col md:flex-row">
+                  <div className="aspect-square w-full overflow-hidden border-b border-white/10 bg-black md:w-56 md:flex-shrink-0 md:border-b-0 md:border-r">
+                    <ImageWithFallback
+                      src={release.coverArt}
+                      alt={release.title}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-5 md:p-6">
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      <span className="border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-300">
+                        {release.type}
+                      </span>
+                      <span className="border border-white/10 bg-white/[0.02] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-500">
+                        {formatTrackCount(release.tracks.length)}
+                      </span>
+                    </div>
+
+                    <h3 className="text-2xl">{release.title}</h3>
+                    <p className="mt-3 flex-1 text-sm leading-relaxed text-gray-400">
+                      {release.description || "No description added for this release yet."}
+                    </p>
+
+                    <motion.button
+                      type="button"
+                      onClick={() => setExpandedRelease(isExpanded ? null : release.id)}
+                      className="mt-6 inline-flex items-center gap-2 self-start border border-white/20 px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-300 transition-colors hover:border-white/40 hover:bg-white/[0.05] hover:text-white"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {isExpanded ? "hide tracks" : "view tracks"}
+                    </motion.button>
                   </div>
                 </div>
 
-                {/* Release Info */}
-                <div className="p-6">
-                  <h3 className="text-xl mb-2">{release.title}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{release.description}</p>
-                  
-                  {/* Toggle Tracklist Button */}
-                  <motion.button
-                    onClick={() => setExpandedRelease(expandedRelease === release.id ? null : release.id)}
-                    className="text-sm text-gray-400 hover:text-white transition-colors mb-4"
-                    whileHover={{ x: 5 }}
-                  >
-                    {expandedRelease === release.id ? '− hide tracks' : '+ view tracks'}
-                  </motion.button>
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="overflow-hidden border-t border-white/10"
+                    >
+                      <div className="space-y-3 p-4 md:p-5">
+                        {release.tracks.map((track, trackIndex) => {
+                          const isActiveTrack = currentTrack?.track?.id === track.id;
 
-                  {/* Tracklist */}
-                  <AnimatePresence>
-                    {expandedRelease === release.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="space-y-3 pt-4 border-t border-white/10">
-                          {release.tracks.map((track, trackIndex) => (
+                          return (
                             <motion.div
                               key={track.id}
-                              initial={{ x: -20, opacity: 0 }}
+                              initial={{ x: -10, opacity: 0 }}
                               animate={{ x: 0, opacity: 1 }}
-                              transition={{ delay: trackIndex * 0.05 }}
-                              className="group"
+                              transition={{ delay: trackIndex * 0.04 }}
+                              className="border border-white/10 bg-white/[0.02] p-3"
                             >
-                              <div className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors rounded">
-                                {/* Play Button */}
+                              <div className="flex items-start gap-3">
                                 <motion.button
+                                  type="button"
                                   onClick={() => handleTrackClick(track, release)}
-                                  className="w-8 h-8 flex items-center justify-center border border-white/20 hover:border-white/60 hover:bg-white/10 transition-all flex-shrink-0"
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
+                                  className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center border border-white/20 transition-colors hover:border-white/50 hover:bg-white/[0.08]"
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
                                 >
                                   {isTrackPlaying(track.id) ? (
-                                    <Pause className="w-4 h-4" />
+                                    <Pause className="h-4 w-4" />
                                   ) : (
-                                    <Play className="w-4 h-4 ml-0.5" />
+                                    <Play className="ml-0.5 h-4 w-4" />
                                   )}
                                 </motion.button>
 
-                                {/* Track Info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2 mb-1">
-                                    <span className="text-sm truncate">{track.title}</span>
-                                    <span className="text-xs text-gray-500 flex-shrink-0">{track.duration}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <span className="truncate text-sm md:text-base">{track.title}</span>
+                                    <span className="flex-shrink-0 text-xs uppercase tracking-[0.16em] text-gray-500">
+                                      {track.duration}
+                                    </span>
                                   </div>
-                                  
-                                  {/* Waveform */}
+
                                   <Waveform
                                     data={track.waveformData}
+                                    audioUrl={track.audioUrl}
                                     isPlaying={isTrackPlaying(track.id)}
-                                    height={30}
-                                    progress={
-                                      currentTrack?.track?.id === track.id && duration > 0
-                                        ? currentTime / duration
-                                        : 0
-                                    }
-                                    currentTime={currentTrack?.track?.id === track.id ? currentTime : 0}
-                                    duration={currentTrack?.track?.id === track.id ? duration : 0}
+                                    height={34}
+                                    progress={isActiveTrack && duration > 0 ? currentTime / duration : 0}
+                                    currentTime={isActiveTrack ? currentTime : 0}
+                                    duration={isActiveTrack ? duration : 0}
                                     onSeek={
-                                      currentTrack?.track?.id === track.id
+                                      isActiveTrack
                                         ? (nextTime) => handleTrackSeek(track.id, nextTime)
                                         : undefined
                                     }
                                     seekLabel={`Seek ${track.title}`}
-                                    disabled={currentTrack?.track?.id !== track.id}
+                                    disabled={!isActiveTrack}
                                   />
                                 </div>
                               </div>
                             </motion.div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </motion.div>
   );
 }

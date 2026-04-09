@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
+import { ViewportPortal } from "./viewport-portal";
 
 export function ChangePasswordModal({ onClose, onSuccess, isFirstTimeLogin = false }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -38,6 +39,7 @@ export function ChangePasswordModal({ onClose, onSuccess, isFirstTimeLogin = fal
   };
 
   return (
+    <ViewportPortal>
     <motion.div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
       initial={{ opacity: 0 }}
@@ -167,5 +169,6 @@ export function ChangePasswordModal({ onClose, onSuccess, isFirstTimeLogin = fal
         </form>
       </motion.div>
     </motion.div>
+    </ViewportPortal>
   );
 }

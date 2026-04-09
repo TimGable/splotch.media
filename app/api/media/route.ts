@@ -7,11 +7,13 @@ import {
 } from "@/lib/supabase/app-user";
 import { getSupabaseStorageBucket } from "@/lib/supabase/config";
 import { ensureStorageBucketExists } from "@/lib/supabase/storage";
+import { getMediaSocialSummary } from "@/lib/media-social";
 
 const MEDIA_KINDS = new Set(["music", "visual", "video"]);
 const MUSIC_RELEASE_TYPES = new Set(["single", "ep", "album"]);
 const VISIBILITY_LEVELS = new Set(["private", "invite_only", "public", "unlisted"]);
-const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024;
+const MAX_STANDARD_FILE_SIZE_BYTES = 250 * 1024 * 1024;
+const MAX_VIDEO_FILE_SIZE_BYTES = 1024 * 1024 * 1024;
 const MAX_COVER_ART_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_TRACKS_PER_RELEASE = 15;
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -52,6 +54,14 @@ function buildObjectKey(params: {
 
 function isAllowedCoverArtMimeType(mimeType: string) {
   return mimeType.startsWith(IMAGE_MIME_PREFIX) && !BLOCKED_IMAGE_MIME_TYPES.has(mimeType);
+}
+
+function getMaxUploadSizeBytes(mediaKind: string) {
+  return mediaKind === "video" ? MAX_VIDEO_FILE_SIZE_BYTES : MAX_STANDARD_FILE_SIZE_BYTES;
+}
+
+function formatMaxUploadSizeLabel(mediaKind: string) {
+  return mediaKind === "video" ? "1 GB" : "250 MB";
 }
 
 function fileNameToTitle(fileName: string) {
@@ -351,6 +361,84 @@ async function createMusicUploadRecord(params: {
   };
 }
 
+async function replaceCoverArt(params: {
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>;
+  bucket: string;
+  userId: string;
+  mediaItemId: string;
+  coverArt: File;
+}) {
+  const { supabase, bucket, userId, mediaItemId, coverArt } = params;
+
+  const { data: existingCoverAssets, error: existingCoverAssetsError } = await supabase
+    .from("media_assets")
+    .select("id, bucket, object_key")
+    .eq("media_item_id", mediaItemId)
+    .eq("role", "thumbnail");
+
+  if (existingCoverAssetsError) {
+    throw new Error(existingCoverAssetsError.message);
+  }
+
+  const coverAssetId = crypto.randomUUID();
+  const coverFileName = sanitizeFileName(coverArt.name || "cover-art.bin");
+  const coverObjectKey = buildObjectKey({
+    userId,
+    mediaItemId,
+    assetId: coverAssetId,
+    fileName: coverFileName,
+    variant: "thumbnail",
+  });
+  const coverBuffer = Buffer.from(await coverArt.arrayBuffer());
+
+  const { error: coverUploadError } = await supabase.storage.from(bucket).upload(coverObjectKey, coverBuffer, {
+    contentType: coverArt.type || "application/octet-stream",
+    upsert: false,
+  });
+
+  if (coverUploadError) {
+    throw new Error(`Failed to upload cover art to storage: ${coverUploadError.message}`);
+  }
+
+  const { error: coverInsertError } = await supabase.from("media_assets").insert({
+    id: coverAssetId,
+    media_item_id: mediaItemId,
+    owner_user_id: userId,
+    role: "thumbnail",
+    storage_provider: "supabase",
+    bucket,
+    object_key: coverObjectKey,
+    file_name: coverFileName,
+    mime_type: coverArt.type || "application/octet-stream",
+    file_size_bytes: coverArt.size,
+  });
+
+  if (coverInsertError) {
+    await supabase.storage.from(bucket).remove([coverObjectKey]);
+    throw new Error(coverInsertError.message);
+  }
+
+  const previousCoverAssets = existingCoverAssets ?? [];
+  if (previousCoverAssets.length > 0) {
+    const previousIds = previousCoverAssets.map((asset) => asset.id);
+    await supabase.from("media_assets").delete().in("id", previousIds);
+
+    const previousObjectsByBucket = new Map<string, string[]>();
+    for (const asset of previousCoverAssets) {
+      previousObjectsByBucket.set(asset.bucket, [
+        ...(previousObjectsByBucket.get(asset.bucket) || []),
+        asset.object_key,
+      ]);
+    }
+
+    for (const [previousBucket, objectKeys] of previousObjectsByBucket.entries()) {
+      if (objectKeys.length > 0) {
+        await supabase.storage.from(previousBucket).remove(objectKeys);
+      }
+    }
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext(request);
@@ -377,6 +465,7 @@ export async function GET(request: Request) {
 
     const items = mediaItems ?? [];
     const itemIds = items.map((item) => item.id);
+    const socialSummaryByItemId = await getMediaSocialSummary(supabase, itemIds, userId);
 
     const primaryAssetsById = new Map<string, Record<string, unknown>>();
     const coverAssetsByItemId = new Map<string, Record<string, unknown>>();
@@ -419,6 +508,9 @@ export async function GET(request: Request) {
         durationMs: item.duration_ms,
         asset: item.primary_asset_id ? primaryAssetsById.get(item.primary_asset_id) ?? null : null,
         coverAsset: coverAssetsByItemId.get(item.id) ?? null,
+        likes: socialSummaryByItemId.get(item.id)?.likes || 0,
+        comments: socialSummaryByItemId.get(item.id)?.comments || 0,
+        isLiked: socialSummaryByItemId.get(item.id)?.isLiked || false,
       })),
     });
   } catch (error) {
@@ -451,7 +543,7 @@ export async function POST(request: Request) {
     const releaseType = String(formData.get("releaseType") || "")
       .trim()
       .toLowerCase();
-    const visibility = String(formData.get("visibility") || "invite_only")
+    const visibility = String(formData.get("visibility") || "public")
       .trim()
       .toLowerCase();
     const singleFile = formData.get("file");
@@ -521,9 +613,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "One of the selected files is empty." }, { status: 400 });
       }
 
-      if (file.size > MAX_FILE_SIZE_BYTES) {
+      const maxFileSizeBytes = getMaxUploadSizeBytes(mediaKind);
+      if (file.size > maxFileSizeBytes) {
         return NextResponse.json(
-          { error: "Files must be 250 MB or smaller for this first upload implementation." },
+          { error: `Files in the ${mediaKind} category must be ${formatMaxUploadSizeLabel(mediaKind)} or smaller.` },
           { status: 400 },
         );
       }
@@ -644,17 +737,39 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
   let payload: {
     id?: string;
     title?: string;
     description?: string;
     visibility?: string;
-  };
+  } = {};
+  let coverArt: File | null = null;
 
-  try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+  if (contentType.includes("multipart/form-data")) {
+    let formData: FormData;
+
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json({ error: "Invalid multipart form data." }, { status: 400 });
+    }
+
+    payload = {
+      id: String(formData.get("id") || "").trim(),
+      title: String(formData.get("title") || "").trim(),
+      description: typeof formData.get("description") === "string" ? String(formData.get("description") || "").trim() : "",
+      visibility: String(formData.get("visibility") || "").trim().toLowerCase(),
+    };
+
+    const nextCoverArt = formData.get("coverArt");
+    coverArt = nextCoverArt instanceof File ? nextCoverArt : null;
+  } else {
+    try {
+      payload = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    }
   }
 
   try {
@@ -711,6 +826,33 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Media item not found." }, { status: 404 });
     }
 
+    if (coverArt instanceof File) {
+      if (existingItem.media_kind !== "music") {
+        return NextResponse.json(
+          { error: "Cover art can only be updated for music uploads." },
+          { status: 400 },
+        );
+      }
+
+      if (coverArt.size <= 0) {
+        return NextResponse.json({ error: "The selected cover art file is empty." }, { status: 400 });
+      }
+
+      if (coverArt.size > MAX_COVER_ART_SIZE_BYTES) {
+        return NextResponse.json(
+          { error: "Cover art images must be 10 MB or smaller." },
+          { status: 400 },
+        );
+      }
+
+      if (!isAllowedCoverArtMimeType(coverArt.type || "")) {
+        return NextResponse.json(
+          { error: "Cover art must be a standard image format such as JPG, PNG, WEBP, GIF, or AVIF." },
+          { status: 400 },
+        );
+      }
+    }
+
     const publishedAt = visibility === "private" ? null : existingItem.published_at || new Date().toISOString();
 
     const { error: updateError } = await supabase
@@ -726,6 +868,18 @@ export async function PATCH(request: Request) {
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    if (coverArt instanceof File) {
+      const bucket = getSupabaseStorageBucket();
+      await ensureStorageBucketExists(bucket);
+      await replaceCoverArt({
+        supabase,
+        bucket,
+        userId,
+        mediaItemId,
+        coverArt,
+      });
     }
 
     const { data: updatedItem, error: updatedItemError } = await supabase

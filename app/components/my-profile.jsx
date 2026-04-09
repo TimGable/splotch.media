@@ -1,21 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Upload, Plus, Edit2, Music, Palette, Video, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Upload, Edit2, Music, Palette, Video, Check } from "lucide-react";
 import { ChangePasswordModal } from "./change-password-modal";
+import { ArchiveLoadingState } from "./archive-loading-state";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { UploadContentModal } from "./upload-content-modal";
-import { MusicReleasePlayer } from "./music-release-player";
 import { EditUploadModal } from "./edit-upload-modal";
+import { ImageCropModal } from "./image-crop-modal";
 import { MediaItemPage } from "./media-item-page";
+import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
+import { ProfileArchiveView } from "./profile-archive-view";
+import { ProfileConnectionsModal } from "./profile-connections-modal";
+import { attachPublicMediaSlugs, buildPublicMediaPath } from "@/lib/media-slugs";
+import { CONTENT_SWAP_ANIMATION, PAGE_TRANSITION, PROFILE_PANEL_SWAP_ANIMATION } from "@/lib/motion";
+
+const PROFILE_DETAIL_HISTORY_KEY = "__omaProfileDetail";
 
 function isGeneratedUsername(username) {
   return typeof username === "string" && /_[a-f0-9]{8}$/.test(username);
+}
+
+function isValidEmailAddress(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
 
 export function MyProfile({
   onBack,
   forceSetup = false,
   onSetupComplete,
+  navigationIntent = "",
+  onNavigationIntentHandled,
   currentTrack,
   isPlaying,
   onPlayTrack,
@@ -26,15 +41,21 @@ export function MyProfile({
   duration,
   onSeekTrack,
 }) {
+  const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const avatarInputRef = useRef(null);
   const [isEditing, setIsEditing] = useState(forceSetup);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingMedia, setIsLoadingMedia] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(12);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingMediaItem, setEditingMediaItem] = useState(null);
   const [selectedMediaItem, setSelectedMediaItem] = useState(null);
+  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
+  const [avatarDraft, setAvatarDraft] = useState(null);
+  const [lightboxState, setLightboxState] = useState({ kind: "", index: -1 });
+  const [connectionsView, setConnectionsView] = useState(null);
   const [uploadKind, setUploadKind] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -54,17 +75,34 @@ export function MyProfile({
     followingCount: 0,
     categoryTags: [],
   });
+  const [emailChangeData, setEmailChangeData] = useState({
+    currentEmail: "",
+    newEmail: "",
+  });
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
   const isEditMode = forceSetup || isEditing;
-  const musicItems = mediaItems.filter((item) => item.mediaKind === "music");
-  const visualItems = mediaItems.filter((item) => item.mediaKind === "visual");
-  const videoItems = mediaItems.filter((item) => item.mediaKind === "video");
-  const avatarFallback = (profileData.displayName || profileData.username || "?")
-    .charAt(0)
-    .toUpperCase();
+  const mediaItemsWithSlugs = useMemo(() => attachPublicMediaSlugs(mediaItems), [mediaItems]);
+  const musicItems = mediaItemsWithSlugs.filter((item) => item.mediaKind === "music");
+  const visualItems = mediaItemsWithSlugs.filter((item) => item.mediaKind === "visual");
+  const videoItems = mediaItemsWithSlugs.filter((item) => item.mediaKind === "video");
+  const lightboxItems = lightboxState.kind === "video" ? videoItems : visualItems;
   const activeMusicItemId = currentTrack?.track?.id || null;
   const artistIdentity = {
     name: profileData.displayName || profileData.username || "artist",
     username: profileData.username,
+  };
+
+  const resolvePreferredUploadKind = () => {
+    if (profileData.categoryTags.includes("music")) {
+      return "music";
+    }
+    if (profileData.categoryTags.includes("visual")) {
+      return "visual";
+    }
+    if (profileData.categoryTags.includes("video")) {
+      return "video";
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -72,7 +110,7 @@ export function MyProfile({
       return;
     }
 
-    const nextSelectedItem = mediaItems.find((item) => item.id === selectedMediaItem.id);
+    const nextSelectedItem = mediaItemsWithSlugs.find((item) => item.id === selectedMediaItem.id);
     if (!nextSelectedItem) {
       setSelectedMediaItem(null);
       return;
@@ -81,7 +119,96 @@ export function MyProfile({
     if (nextSelectedItem !== selectedMediaItem) {
       setSelectedMediaItem(nextSelectedItem);
     }
-  }, [mediaItems, selectedMediaItem]);
+  }, [mediaItemsWithSlugs, selectedMediaItem]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handlePopState = (event) => {
+      const state = event.state;
+      if (state?.[PROFILE_DETAIL_HISTORY_KEY]) {
+        return;
+      }
+
+      setSelectedMediaItem(null);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleIntent = (intent) => {
+      if (intent === "settings") {
+        setIsEditing(true);
+        return true;
+      }
+
+      if (intent === "upload") {
+        const nextKind = resolvePreferredUploadKind();
+        if (nextKind) {
+          setUploadKind(nextKind);
+          setShowUploadModal(true);
+        } else {
+          setIsEditing(true);
+        }
+        return true;
+      }
+
+      return false;
+    };
+
+    const consumeHashIntent = () => {
+      const intent = window.location.hash.replace(/^#/, "").trim().toLowerCase();
+      if (!handleIntent(intent)) {
+        return;
+      }
+
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    };
+
+    consumeHashIntent();
+    window.addEventListener("hashchange", consumeHashIntent);
+
+    return () => {
+      window.removeEventListener("hashchange", consumeHashIntent);
+    };
+  }, [profileData.categoryTags]);
+
+  useEffect(() => {
+    if (!navigationIntent) {
+      return;
+    }
+
+    if (navigationIntent === "settings") {
+      setIsEditing(true);
+      onNavigationIntentHandled?.();
+      return;
+    }
+
+    if (navigationIntent === "upload") {
+      const nextKind = resolvePreferredUploadKind();
+      if (nextKind) {
+        setUploadKind(nextKind);
+        setShowUploadModal(true);
+      } else {
+        setIsEditing(true);
+      }
+      onNavigationIntentHandled?.();
+    }
+  }, [navigationIntent, onNavigationIntentHandled, profileData.categoryTags]);
 
   const toggleCategoryTag = (tag) => {
     if (profileData.categoryTags.includes(tag)) {
@@ -101,8 +228,10 @@ export function MyProfile({
     let mounted = true;
 
     async function loadProfile() {
+      const startedAt = Date.now();
       setIsLoadingProfile(true);
       setIsLoadingMedia(true);
+      setLoadingProgress(12);
 
       const {
         data: { session },
@@ -111,10 +240,13 @@ export function MyProfile({
       if (!mounted) return;
       if (!session?.access_token) {
         setProfileNotice({ type: "error", message: "Session expired. Please sign in again." });
+        setLoadingProgress(100);
         setIsLoadingProfile(false);
         setIsLoadingMedia(false);
         return;
       }
+
+      setLoadingProgress(24);
 
       const [authUser, profileResponse, mediaResponse] = await Promise.all([
         supabase.auth.getUser(),
@@ -132,10 +264,13 @@ export function MyProfile({
 
       if (!mounted) return;
 
+      setLoadingProgress(58);
+
       const currentEmail = authUser?.data?.user?.email || "";
       if (!profileResponse.ok) {
         const payload = await profileResponse.json().catch(() => ({}));
         setProfileNotice({ type: "error", message: payload?.error || "Failed to load profile." });
+        setLoadingProgress(100);
         setIsLoadingProfile(false);
         setIsLoadingMedia(false);
         return;
@@ -155,6 +290,11 @@ export function MyProfile({
         categoryTags: apiProfile?.categoryTags || [],
         email: currentEmail,
       }));
+      setEmailChangeData({
+        currentEmail: "",
+        newEmail: "",
+      });
+      setIsChangingEmail(false);
 
       if (!mediaResponse.ok) {
         const mediaPayload = await mediaResponse.json().catch(() => ({}));
@@ -167,6 +307,16 @@ export function MyProfile({
         const mediaPayload = await mediaResponse.json();
         setMediaItems(mediaPayload?.items || []);
       }
+
+      setLoadingProgress(100);
+
+      const elapsed = Date.now() - startedAt;
+      const minLoadDuration = 560;
+      if (elapsed < minLoadDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minLoadDuration - elapsed));
+      }
+
+      if (!mounted) return;
 
       setIsLoadingProfile(false);
       setIsLoadingMedia(false);
@@ -249,9 +399,47 @@ export function MyProfile({
     }
 
     const currentEmail = userData.user.email || "";
-    const nextEmail = profileData.email.trim().toLowerCase();
+    const submittedCurrentEmail = emailChangeData.currentEmail.trim().toLowerCase();
+    const nextEmail = emailChangeData.newEmail.trim().toLowerCase();
+    const isEmailChangeRequested = Boolean(submittedCurrentEmail || nextEmail);
 
-    if (nextEmail && nextEmail !== currentEmail) {
+    if (isEmailChangeRequested) {
+      if (!submittedCurrentEmail || !nextEmail) {
+        setProfileNotice({
+          type: "error",
+          message: "Enter both your current email and the new email you want to use.",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      if (!isValidEmailAddress(nextEmail)) {
+        setProfileNotice({
+          type: "error",
+          message: "Enter a valid new email address.",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      if (submittedCurrentEmail !== currentEmail.toLowerCase()) {
+        setProfileNotice({
+          type: "error",
+          message: "Current email does not match the account you are signed into.",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      if (nextEmail === currentEmail.toLowerCase()) {
+        setProfileNotice({
+          type: "error",
+          message: "Enter a different new email address.",
+        });
+        setIsSaving(false);
+        return;
+      }
+
       const { error: emailUpdateError } = await supabase.auth.updateUser({ email: nextEmail });
       if (emailUpdateError) {
         setProfileNotice({ type: "error", message: emailUpdateError.message || "Failed to update email." });
@@ -259,9 +447,14 @@ export function MyProfile({
         return;
       }
 
+      setEmailChangeData({
+        currentEmail: "",
+        newEmail: "",
+      });
+      setIsChangingEmail(false);
       setProfileNotice({
         type: "success",
-        message: "Profile saved. Check your inbox to confirm the email change.",
+        message: "Profile saved. Check the new email inbox to confirm the change.",
       });
     } else {
       setProfileNotice({ type: "success", message: "Profile saved." });
@@ -317,14 +510,7 @@ export function MyProfile({
     return "Single";
   };
 
-  const handleAvatarSelected = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
+  const uploadAvatarFile = async (file) => {
     setIsUploadingAvatar(true);
     setProfileNotice({ type: "", message: "" });
 
@@ -365,6 +551,7 @@ export function MyProfile({
         ...prev,
         avatar: payload?.avatar?.url || "",
       }));
+      setAvatarDraft(null);
       setProfileNotice({
         type: "success",
         message: "Avatar updated.",
@@ -377,6 +564,17 @@ export function MyProfile({
     } finally {
       setIsUploadingAvatar(false);
     }
+  };
+
+  const handleAvatarSelected = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setAvatarDraft(file);
   };
 
   const handleRemoveAvatar = async () => {
@@ -501,7 +699,13 @@ export function MyProfile({
         : payload.item
           ? [payload.item]
           : [];
-      setMediaItems((current) => [...newItems, ...current]);
+      const hydratedNewItems = newItems.map((item) => ({
+        likes: 0,
+        comments: 0,
+        isLiked: false,
+        ...item,
+      }));
+      setMediaItems((current) => [...hydratedNewItems, ...current]);
       setContentNotice({
         type: "success",
         message:
@@ -580,7 +784,7 @@ export function MyProfile({
     }
   };
 
-  const handleSaveMediaItem = async ({ id, title, description, visibility }) => {
+  const handleSaveMediaItem = async ({ id, title, description, visibility, coverArt }) => {
     setIsUpdatingMedia(true);
     setContentNotice({ type: "", message: "" });
 
@@ -597,19 +801,22 @@ export function MyProfile({
         return;
       }
 
-      const response = await fetch("/api/media", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          id,
-          title,
-          description,
-          visibility,
-        }),
-      });
+        const body = new FormData();
+        body.append("id", id);
+        body.append("title", title);
+        body.append("description", description);
+        body.append("visibility", visibility);
+        if (coverArt instanceof File) {
+          body.append("coverArt", coverArt);
+        }
+
+        const response = await fetch("/api/media", {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body,
+        });
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -620,13 +827,27 @@ export function MyProfile({
         return;
       }
 
+      let mergedItem = payload.item;
       setMediaItems((current) =>
-        current.map((item) => (item.id === id ? payload.item : item)),
+        current.map((item) => {
+          if (item.id !== id) {
+            return item;
+          }
+
+          mergedItem = {
+            ...item,
+            ...payload.item,
+            likes: item.likes || 0,
+            comments: item.comments || 0,
+            isLiked: Boolean(item.isLiked),
+          };
+          return mergedItem;
+        }),
       );
       if (selectedMediaItem?.id === id) {
-        setSelectedMediaItem(payload.item);
+        setSelectedMediaItem(mergedItem);
       }
-      onMediaItemUpdated?.(payload.item);
+      onMediaItemUpdated?.(mergedItem);
       setEditingMediaItem(null);
       setContentNotice({
         type: "success",
@@ -662,6 +883,28 @@ export function MyProfile({
     setEditingMediaItem(item);
   };
 
+  const handleMediaSocialUpdate = (mediaItemId, socialUpdate) => {
+    setMediaItems((current) =>
+      current.map((item) =>
+        item.id === mediaItemId
+          ? {
+              ...item,
+              ...socialUpdate,
+            }
+          : item,
+      ),
+    );
+
+    setSelectedMediaItem((current) =>
+      current?.id === mediaItemId
+        ? {
+            ...current,
+            ...socialUpdate,
+          }
+        : current,
+    );
+  };
+
   const handleAddMusicItemToQueue = (item) => {
     if (!item?.asset?.url || !onAddTrackToQueue) {
       return;
@@ -674,57 +917,102 @@ export function MyProfile({
     });
   };
 
-  const handleShareMusicItem = async (item) => {
-    const shareText = `${item.title} by ${artistIdentity.name}`;
+  const handleShareMusicItem = (item) => {
+    const publicSharePath =
+      profileData.username &&
+      item.slug &&
+      (item.visibility === "public" || item.visibility === "unlisted")
+        ? buildPublicMediaPath(profileData.username, item.slug)
+        : "";
     const shareUrl =
       typeof window !== "undefined"
-        ? `${window.location.origin}${window.location.pathname}#track-${item.id}`
+        ? publicSharePath
+          ? `${window.location.origin}${publicSharePath}`
+          : `${window.location.origin}${window.location.pathname}#track-${item.id}`
         : "";
 
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: shareText,
-          text: shareText,
-          url: shareUrl || undefined,
-        });
-        return;
-      }
-
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl ? `${shareText}\n${shareUrl}` : shareText);
-        setContentNotice({
-          type: "success",
-          message: "Track details copied to your clipboard.",
-        });
-        return;
-      }
-
-      setContentNotice({
-        type: "error",
-        message: "Sharing is not available in this browser.",
-      });
-    } catch (error) {
-      setContentNotice({
-        type: "error",
-        message: error instanceof Error ? error.message : "Failed to share track.",
-      });
-    }
+    return shareUrl;
   };
 
   const openMediaItemPage = (item) => {
+    const hasPublicMediaRoute =
+      !forceSetup &&
+      profileData.username &&
+      !isGeneratedUsername(profileData.username) &&
+      item?.slug;
+
+    if (hasPublicMediaRoute) {
+      router.push(buildPublicMediaPath(profileData.username, item.slug));
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const nextState = {
+        ...(window.history.state || {}),
+        [PROFILE_DETAIL_HISTORY_KEY]: item.id,
+      };
+
+      if (selectedMediaItem?.id) {
+        window.history.replaceState(nextState, "", window.location.href);
+      } else {
+        window.history.pushState(nextState, "", window.location.href);
+      }
+    }
+
     setSelectedMediaItem(item);
+  };
+
+  const closeMediaItemPage = () => {
+    if (typeof window !== "undefined" && window.history.state?.[PROFILE_DETAIL_HISTORY_KEY]) {
+      window.history.back();
+      return;
+    }
+
+    setSelectedMediaItem(null);
+  };
+
+  const isInitialArchiveLoading = (isLoadingProfile || isLoadingMedia) && !selectedMediaItem && !isEditMode;
+  const isInitialEditLoading = (isLoadingProfile || isLoadingMedia) && isEditMode;
+
+  const openVisualLightbox = (item) => {
+    const nextIndex = visualItems.findIndex((entry) => entry.id === item.id);
+    if (nextIndex !== -1) {
+      setLightboxState({ kind: "visual", index: nextIndex });
+    }
+  };
+
+  const openVideoLightbox = (item) => {
+    const nextIndex = videoItems.findIndex((entry) => entry.id === item.id);
+    if (nextIndex !== -1) {
+      setLightboxState({ kind: "video", index: nextIndex });
+    }
+  };
+
+  const handleProfileBack = () => {
+    if (isNavigatingBack) {
+      return;
+    }
+
+    setIsNavigatingBack(true);
+    window.setTimeout(() => {
+      onBack?.();
+    }, 260);
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
+      animate={
+        isNavigatingBack
+          ? { opacity: 0, y: -16, scale: 0.992, filter: "blur(8px)" }
+          : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+      }
+      transition={PAGE_TRANSITION}
     >
       {!forceSetup && (
         <motion.button
-          onClick={onBack}
+          onClick={handleProfileBack}
+          disabled={isNavigatingBack}
           className="mb-6 md:mb-8 text-gray-400 hover:text-white transition-colors relative group inline-block touch-manipulation"
           whileHover={{ x: -5 }}
           whileTap={{ scale: 0.95 }}
@@ -740,23 +1028,11 @@ export function MyProfile({
         </motion.button>
       )}
 
-      <div className="flex items-center justify-between mb-8 md:mb-12">
-        <h2 className="text-3xl md:text-4xl">my profile</h2>
-        
-        {/* Edit Profile Button - Only show in view mode */}
-        {!isEditMode && (
-          <motion.button
-            onClick={() => setIsEditing(true)}
-            className="flex items-center gap-2 border border-white/40 px-4 md:px-6 py-2.5 md:py-3 hover:border-white/60 hover:bg-white/10 transition-all duration-300 touch-manipulation"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Edit2 className="w-4 h-4" />
-            <span className="hidden md:inline">edit profile</span>
-            <span className="md:hidden">edit</span>
-          </motion.button>
-        )}
-      </div>
+      {isEditMode && (
+        <div className="mb-8 md:mb-12">
+          <h2 className="text-3xl md:text-4xl">account settings</h2>
+        </div>
+      )}
 
       {profileNotice.message && (
         <div
@@ -776,12 +1052,6 @@ export function MyProfile({
         </div>
       )}
 
-      {isLoadingProfile && (
-        <div className="mb-6 border border-white/20 bg-white/5 px-4 py-3 text-sm text-gray-400">
-          loading profile...
-        </div>
-      )}
-
       <AnimatePresence mode="wait">
         {isEditMode ? (
           // EDIT MODE
@@ -792,8 +1062,25 @@ export function MyProfile({
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4 }}
           >
-            {/* Profile Edit Section */}
-            <div className="border border-white/20 p-4 md:p-8 mb-12">
+            <AnimatePresence mode="wait" initial={false}>
+              {isInitialEditLoading ? (
+                <motion.div
+                  key="profile-edit-loading"
+                  {...CONTENT_SWAP_ANIMATION}
+                  transition={PAGE_TRANSITION}
+                >
+                  <ArchiveLoadingState
+                    label="profile setup"
+                    progress={loadingProgress}
+                  />
+                </motion.div>
+              ) : (
+            <motion.div
+              key="profile-edit-content"
+              className="border border-white/20 p-4 md:p-8 mb-12"
+              {...CONTENT_SWAP_ANIMATION}
+              transition={PAGE_TRANSITION}
+            >
               <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8 mb-8">
                 {/* Avatar Upload */}
                 <div className="flex-shrink-0 mx-auto md:mx-0">
@@ -858,7 +1145,7 @@ export function MyProfile({
                 </div>
 
                 {/* Profile Info */}
-                <div className="flex-1 w-full">
+                <motion.div className="flex-1 w-full" layout transition={PAGE_TRANSITION}>
                   {/* Username Field */}
                   <div className="mb-6">
                     <label className="block text-sm text-gray-400 mb-2">
@@ -892,24 +1179,88 @@ export function MyProfile({
                     />
                   </div>
 
-                  <div className="mb-6">
+                  <motion.div className="mb-6" layout transition={PAGE_TRANSITION}>
                     <label className="block text-sm text-gray-400 mb-2">
-                      email
-                      <span className="text-gray-500 ml-2 text-xs">(used for sign in)</span>
+                      account email
+                      <span className="text-gray-500 ml-2 text-xs">(current sign-in address)</span>
                     </label>
-                    <input
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                      placeholder="email address"
-                      className="w-full bg-transparent border border-white/20 px-4 py-3 focus:border-white/60 focus:outline-none transition-colors"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      changing email may require confirmation via inbox.
-                    </p>
-                  </div>
+                    <div className="w-full border border-white/10 bg-white/[0.03] px-4 py-3 text-white/60">
+                      {profileData.email || "no email loaded"}
+                    </div>
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsChangingEmail((current) => !current);
+                          if (isChangingEmail) {
+                            setEmailChangeData({
+                              currentEmail: "",
+                              newEmail: "",
+                            });
+                          }
+                        }}
+                        className="text-xs uppercase tracking-[0.18em] text-gray-400 transition-colors hover:text-white"
+                      >
+                        {isChangingEmail ? "cancel email change" : "change email"}
+                      </button>
+                    </div>
+                  </motion.div>
 
-                  <div className="mb-6">
+                  <AnimatePresence initial={false}>
+                    {isChangingEmail ? (
+                      <motion.div
+                        layout
+                        className="mb-6 border border-white/10 bg-white/[0.02] p-4 md:p-5"
+                        initial={{ opacity: 0, y: -8, filter: "blur(4px)" }}
+                        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+                        transition={PAGE_TRANSITION}
+                      >
+                        <div className="mb-5">
+                          <label className="block text-sm text-gray-400 mb-2">
+                            current email
+                            <span className="text-gray-500 ml-2 text-xs">(required to confirm change)</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={emailChangeData.currentEmail}
+                            onChange={(e) =>
+                              setEmailChangeData((current) => ({
+                                ...current,
+                                currentEmail: e.target.value,
+                              }))
+                            }
+                            placeholder="enter current email"
+                            className="w-full bg-transparent border border-white/20 px-4 py-3 focus:border-white/60 focus:outline-none transition-colors"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-2">
+                            new email
+                            <span className="text-gray-500 ml-2 text-xs">(confirmation goes here)</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={emailChangeData.newEmail}
+                            onChange={(e) =>
+                              setEmailChangeData((current) => ({
+                                ...current,
+                                newEmail: e.target.value,
+                              }))
+                            }
+                            placeholder="enter new email"
+                            className="w-full bg-transparent border border-white/20 px-4 py-3 focus:border-white/60 focus:outline-none transition-colors"
+                          />
+                          <p className="text-xs text-gray-500 mt-2">
+                            This change will stay pending until the new email is confirmed.
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+
+                  <motion.div className="mb-6" layout transition={PAGE_TRANSITION}>
                     <label className="block text-sm text-gray-400 mb-2">bio</label>
                     <textarea
                       value={profileData.bio}
@@ -918,37 +1269,31 @@ export function MyProfile({
                       rows={4}
                       className="w-full bg-transparent border border-white/20 px-4 py-3 focus:border-white/60 focus:outline-none transition-colors resize-none"
                     />
-                  </div>
+                  </motion.div>
 
-                  <div className="flex gap-4">
-                    <motion.button
-                      onClick={handleSaveProfile}
-                      disabled={isSaving}
-                      className="border border-white/40 px-8 py-3 hover:border-white/60 hover:bg-white/10 transition-all duration-300"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isSaving ? "saving..." : "save profile"}
-                    </motion.button>
-                    {!forceSetup && (
-                      <motion.button
-                        onClick={() => {
-                          setIsEditing(false);
-                          setProfileNotice({ type: "", message: "" });
-                        }}
-                        className="border border-white/20 px-8 py-3 hover:border-white/40 hover:bg-white/5 transition-all duration-300 text-gray-400"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        cancel
-                      </motion.button>
-                    )}
-                  </div>
-                </div>
+                </motion.div>
+              </div>
+
+              {/* Change Password */}
+              <div className="border-t border-white/10 pt-6 mt-6">
+                <motion.button
+                  onClick={() => setShowChangePassword(true)}
+                  className="border border-white/40 px-6 py-2 hover:border-white/60 hover:bg-white/10 transition-all duration-300 text-sm relative group touch-manipulation"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="tracking-wide">change password</span>
+                  <motion.div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
+                    initial={{ scaleX: 0 }}
+                    whileHover={{ scaleX: 1 }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.button>
               </div>
 
               {/* Category Tags Section */}
-              <div className="border-t border-white/10 pt-8 mt-8">
+              <div className="border-t border-white/10 pt-6 mt-6">
                 <h4 className="text-lg mb-2">content categories</h4>
                 <p className="text-sm text-gray-400 mb-6">
                   select the type(s) of content you create. your profile will appear in these browse categories.
@@ -1009,51 +1354,76 @@ export function MyProfile({
                 </div>
 
                 {/* Selected tags preview */}
-                {profileData.categoryTags.length > 0 && (
-                  <motion.div
-                    className="mt-6 p-4 border border-white/10 bg-white/5"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    <p className="text-sm text-gray-400 mb-2">your content will appear in:</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {profileData.categoryTags.map((tag) => {
-                        const category = categories.find(c => c.id === tag);
-                        const Icon = category?.icon;
-                        return (
-                          <div key={tag} className="flex items-center gap-2 px-3 py-1.5 border border-white/20 bg-white/5">
-                            {Icon && <Icon className="w-4 h-4" />}
-                            <span className="text-sm">{category?.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
+                <AnimatePresence initial={false}>
+                  {profileData.categoryTags.length > 0 ? (
+                    <motion.div
+                      key="selected-category-preview"
+                      className="mt-6 border border-white/10 bg-white/5 p-4"
+                      initial={{ opacity: 0, y: -10, filter: "blur(8px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
+                      transition={PAGE_TRANSITION}
+                    >
+                      <p className="mb-2 text-sm text-gray-400">your content will appear in:</p>
+                      <div className="flex flex-wrap gap-2">
+                        <AnimatePresence initial={false}>
+                          {profileData.categoryTags.map((tag, index) => {
+                            const category = categories.find((c) => c.id === tag);
+                            const Icon = category?.icon;
+                            return (
+                              <motion.div
+                                key={tag}
+                                layout
+                                className="flex items-center gap-2 border border-white/20 bg-white/5 px-3 py-1.5"
+                                initial={{ opacity: 0, y: 12, scale: 0.96, filter: "blur(8px)" }}
+                                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                                exit={{ opacity: 0, y: -8, scale: 0.98, filter: "blur(6px)" }}
+                                transition={{
+                                  ...PAGE_TRANSITION,
+                                  delay: index * 0.04,
+                                }}
+                              >
+                                {Icon ? <Icon className="h-4 w-4" /> : null}
+                                <span className="text-sm">{category?.label}</span>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
 
-              {/* Security Section */}
-              <div className="border-t border-white/10 pt-6 mt-6">
-                <h4 className="text-lg text-gray-400 mb-4">security</h4>
+              <div className="flex gap-4 border-t border-white/10 pt-6 mt-6">
                 <motion.button
-                  onClick={() => setShowChangePassword(true)}
-                  className="border border-white/40 px-6 py-2 hover:border-white/60 hover:bg-white/10 transition-all duration-300 text-sm relative group touch-manipulation"
+                  onClick={handleSaveProfile}
+                  disabled={isSaving}
+                  className="border border-white/40 px-8 py-3 hover:border-white/60 hover:bg-white/10 transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <span className="tracking-wide">change password</span>
-                  <motion.div
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
-                    initial={{ scaleX: 0 }}
-                    whileHover={{ scaleX: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
+                  {isSaving ? "saving..." : "save profile"}
                 </motion.button>
+                {!forceSetup && (
+                  <motion.button
+                    onClick={() => {
+                      setIsEditing(false);
+                      setProfileNotice({ type: "", message: "" });
+                    }}
+                    className="border border-white/20 px-8 py-3 hover:border-white/40 hover:bg-white/5 transition-all duration-300 text-gray-400"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    cancel
+                  </motion.button>
+                )}
               </div>
-            </div>
+            </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         ) : (
-          // VIEW MODE (Public Profile View)
           <motion.div
             key="view"
             initial={{ opacity: 0, y: 20 }}
@@ -1061,365 +1431,110 @@ export function MyProfile({
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4 }}
           >
-            {/* Public Profile View */}
-            <div className="border border-white/20 p-6 md:p-12 mb-12">
-              <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-8">
-                {/* Avatar */}
-                <div className="flex-shrink-0">
-                  <div className="w-32 h-32 md:w-48 md:h-48 rounded-full border-2 border-white/20 overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                    {profileData.avatar ? (
-                      <img
-                        src={profileData.avatar}
-                        alt={profileData.displayName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-6xl md:text-8xl text-gray-600">
-                        {avatarFallback}
+            <AnimatePresence mode="wait" initial={false}>
+              {isInitialArchiveLoading ? (
+                <motion.div
+                  key="profile-view-loading"
+                  {...CONTENT_SWAP_ANIMATION}
+                  transition={PAGE_TRANSITION}
+                >
+                  <ArchiveLoadingState
+                    label="profile"
+                    progress={loadingProgress}
+                  />
+                </motion.div>
+              ) : selectedMediaItem ? (
+                <motion.div
+                  key={`profile-item-${selectedMediaItem.id}`}
+                  {...PROFILE_PANEL_SWAP_ANIMATION}
+                  transition={PAGE_TRANSITION}
+                >
+                  <MediaItemPage
+                    item={selectedMediaItem}
+                    isPlaying={isPlaying}
+                    isActive={activeMusicItemId === selectedMediaItem.id}
+                    currentTime={activeMusicItemId === selectedMediaItem.id ? currentTime : 0}
+                    duration={activeMusicItemId === selectedMediaItem.id ? duration : 0}
+                    onBack={closeMediaItemPage}
+                    onEdit={openEditUploadModal}
+                    onPlayPause={handlePlayMusicItem}
+                    onAddToQueue={handleAddMusicItemToQueue}
+                    onSeek={(nextTime) => handleSeekMusicItem(selectedMediaItem, nextTime)}
+                    onSocialUpdate={(socialUpdate) => handleMediaSocialUpdate(selectedMediaItem.id, socialUpdate)}
+                    profile={{
+                      username: profileData.username,
+                      displayName: profileData.displayName,
+                    }}
+                    galleryItems={
+                      selectedMediaItem.mediaKind === "visual"
+                        ? visualItems
+                        : selectedMediaItem.mediaKind === "video"
+                          ? videoItems
+                          : []
+                    }
+                    formatUploadDate={formatUploadDate}
+                    formatFileSize={formatFileSize}
+                    formatReleaseType={formatReleaseType}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="profile-archive"
+                  {...PROFILE_PANEL_SWAP_ANIMATION}
+                  transition={PAGE_TRANSITION}
+                >
+                  <ProfileArchiveView
+                    profile={{
+                      username: profileData.username,
+                      displayName: profileData.displayName,
+                      email: profileData.email,
+                      bio: profileData.bio,
+                      avatarUrl: profileData.avatar,
+                      followerCount: profileData.followerCount,
+                      followingCount: profileData.followingCount,
+                      categoryTags: profileData.categoryTags,
+                    }}
+                    items={mediaItemsWithSlugs}
+                    isOwner
+                    headerLabel="profile"
+                    contentHeading="archive"
+                    contentNotice={contentNotice}
+                    isLoadingMedia={isLoadingMedia}
+                    currentTrackId={activeMusicItemId}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    duration={duration}
+                    onOpenItem={openMediaItemPage}
+                    onPlayTrack={handlePlayMusicItem}
+                    onSeekTrack={handleSeekMusicItem}
+                    onAddToQueue={handleAddMusicItemToQueue}
+                    onShare={handleShareMusicItem}
+                    onEditItem={openEditUploadModal}
+                    onUpload={openUploadModal}
+                    onOpenVisual={openVisualLightbox}
+                    onOpenVideo={openVideoLightbox}
+                    onOpenConnections={(view) => setConnectionsView(view)}
+                    emptyCategoryPrompt="choose music, visual, or video in edit mode to start uploading content"
+                    headerActions={
+                      <div className="flex flex-wrap gap-3">
+                        <motion.button
+                          onClick={() => setIsEditing(true)}
+                          className="flex items-center gap-2 border border-white/40 px-4 py-3 text-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                          <span>account settings</span>
+                        </motion.button>
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Profile Info */}
-                <div className="flex-1 text-center md:text-left">
-                  <h3 className="text-3xl md:text-4xl mb-2">{profileData.displayName}</h3>
-                  <p className="text-gray-400 mb-4">@{profileData.username}</p>
-                  {profileData.email && <p className="text-gray-500 mb-4">{profileData.email}</p>}
-
-                  <div className="mb-4 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-400 md:justify-start">
-                    <span>
-                      <span className="text-white font-medium">{profileData.followerCount}</span> followers
-                    </span>
-                    <span>
-                      <span className="text-white font-medium">{profileData.followingCount}</span> following
-                    </span>
-                  </div>
-                  
-                  {/* Category Tags */}
-                  {profileData.categoryTags.length > 0 && (
-                    <div className="flex gap-2 flex-wrap justify-center md:justify-start mb-6">
-                      {profileData.categoryTags.map((tag) => {
-                        const category = categories.find(c => c.id === tag);
-                        const Icon = category?.icon;
-                        return (
-                          <div key={tag} className="flex items-center gap-2 px-3 py-1.5 border border-white/40 bg-white/5">
-                            {Icon && <Icon className="w-4 h-4" />}
-                            <span className="text-sm">{category?.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <p className="text-gray-300 leading-relaxed max-w-2xl">
-                    {profileData.bio}
-                  </p>
-                </div>
-              </div>
-            </div>
+                    }
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Content Section - Shows in both modes */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <h3 className="text-2xl md:text-3xl mb-8">your content</h3>
-
-        {contentNotice.message && (
-          <div
-            className={`mb-6 border px-4 py-3 text-sm ${
-              contentNotice.type === "error"
-                ? "border-red-500/40 bg-red-500/10 text-red-400"
-                : "border-green-500/40 bg-green-500/10 text-green-400"
-            }`}
-          >
-            {contentNotice.message}
-          </div>
-        )}
-
-        {isLoadingMedia && (
-          <div className="mb-6 border border-white/20 bg-white/5 px-4 py-3 text-sm text-gray-400">
-            loading uploaded content...
-          </div>
-        )}
-
-        {/* Upload Sections for Each Selected Category */}
-        {profileData.categoryTags.length > 0 ? (
-          selectedMediaItem ? (
-            <MediaItemPage
-              item={selectedMediaItem}
-              isPlaying={isPlaying}
-              isActive={activeMusicItemId === selectedMediaItem.id}
-              currentTime={activeMusicItemId === selectedMediaItem.id ? currentTime : 0}
-              duration={activeMusicItemId === selectedMediaItem.id ? duration : 0}
-              onBack={() => setSelectedMediaItem(null)}
-              onEdit={openEditUploadModal}
-              onPlayPause={handlePlayMusicItem}
-              onSeek={(nextTime) => handleSeekMusicItem(selectedMediaItem, nextTime)}
-              formatUploadDate={formatUploadDate}
-              formatFileSize={formatFileSize}
-              formatReleaseType={formatReleaseType}
-            />
-          ) : (
-            <div className="space-y-12">
-              {profileData.categoryTags.includes("music") && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Music className="w-6 h-6" />
-                      <h4 className="text-xl">music releases</h4>
-                    </div>
-                    <motion.button
-                      onClick={() => openUploadModal("music")}
-                      className="flex items-center gap-2 border border-white/40 px-4 py-2.5 text-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10 md:px-6 md:py-3 md:text-base touch-manipulation"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>upload release</span>
-                    </motion.button>
-                  </div>
-
-                  {musicItems.length === 0 ? (
-                    <div className="border border-white/20 border-dashed p-12 text-center md:p-16">
-                      <Music className="mx-auto mb-4 h-10 w-10 text-gray-500 md:h-12 md:w-12" />
-                      <p className="mb-2 text-base text-gray-400 md:text-lg">no music releases yet</p>
-                      <p className="mb-6 text-sm text-gray-500">
-                        upload your first single, EP, or album
-                      </p>
-                      <motion.button
-                        onClick={() => openUploadModal("music")}
-                        className="inline-flex items-center gap-2 border border-white/40 px-6 py-2.5 transition-all duration-300 hover:border-white/60 hover:bg-white/10 md:px-8 md:py-3 touch-manipulation"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>upload your first release</span>
-                      </motion.button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-6">
-                      {musicItems.map((item) => (
-                        <MusicReleasePlayer
-                          key={item.id}
-                          item={item}
-                        isActive={activeMusicItemId === item.id}
-                        isPlaying={isPlaying}
-                        onOpen={openMediaItemPage}
-                        onPlayPause={handlePlayMusicItem}
-                        onAddToQueue={handleAddMusicItemToQueue}
-                        onShare={handleShareMusicItem}
-                        onEdit={openEditUploadModal}
-                        currentTime={activeMusicItemId === item.id ? currentTime : 0}
-                        duration={activeMusicItemId === item.id ? duration : 0}
-                          onSeek={(nextTime) => handleSeekMusicItem(item, nextTime)}
-                          formatFileSize={formatFileSize}
-                          formatUploadDate={formatUploadDate}
-                          formatReleaseType={formatReleaseType}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-
-              {profileData.categoryTags.includes("visual") && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.1 }}
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Palette className="w-6 h-6" />
-                      <h4 className="text-xl">visual art</h4>
-                    </div>
-                    <motion.button
-                      onClick={() => openUploadModal("visual")}
-                      className="flex items-center gap-2 border border-white/40 px-4 py-2.5 text-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10 md:px-6 md:py-3 md:text-base touch-manipulation"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>upload artwork</span>
-                    </motion.button>
-                  </div>
-
-                  {visualItems.length === 0 ? (
-                    <div className="border border-white/20 border-dashed p-12 text-center md:p-16">
-                      <Palette className="mx-auto mb-4 h-10 w-10 text-gray-500 md:h-12 md:w-12" />
-                      <p className="mb-2 text-base text-gray-400 md:text-lg">no visual art yet</p>
-                      <p className="mb-6 text-sm text-gray-500">
-                        share your photography, illustrations, or digital art
-                      </p>
-                      <motion.button
-                        onClick={() => openUploadModal("visual")}
-                        className="inline-flex items-center gap-2 border border-white/40 px-6 py-2.5 transition-all duration-300 hover:border-white/60 hover:bg-white/10 md:px-8 md:py-3 touch-manipulation"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>upload your first piece</span>
-                      </motion.button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      {visualItems.map((item) => (
-                        <div key={item.id} className="border border-white/20 bg-white/5 p-5">
-                          <div className="mb-4 flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => openMediaItemPage(item)}
-                                className="text-left text-lg transition-colors hover:text-gray-300"
-                              >
-                                {item.title}
-                              </button>
-                              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-gray-500">
-                                {item.visibility.replace("_", " ")}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => openEditUploadModal(item)}
-                              className="flex items-center gap-2 border border-white/15 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 transition-colors hover:border-white/40 hover:text-white"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                              <span>edit upload</span>
-                            </button>
-                          </div>
-                          {item.asset?.url ? (
-                            <img
-                              src={item.asset.url}
-                              alt={item.title}
-                              className="mb-4 aspect-square w-full object-cover"
-                            />
-                          ) : (
-                            <div className="mb-4 aspect-square w-full bg-white/5" />
-                          )}
-                          <div className="mb-2 flex items-start justify-between gap-3">
-                            <span className="text-xs text-gray-500">{formatUploadDate(item.createdAt)}</span>
-                          </div>
-                          {item.description && (
-                            <p className="text-sm leading-relaxed text-gray-400">{item.description}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-
-              {profileData.categoryTags.includes("video") && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Video className="w-6 h-6" />
-                      <h4 className="text-xl">video content</h4>
-                    </div>
-                    <motion.button
-                      onClick={() => openUploadModal("video")}
-                      className="flex items-center gap-2 border border-white/40 px-4 py-2.5 text-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10 md:px-6 md:py-3 md:text-base touch-manipulation"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>upload video</span>
-                    </motion.button>
-                  </div>
-
-                  {videoItems.length === 0 ? (
-                    <div className="border border-white/20 border-dashed p-12 text-center md:p-16">
-                      <Video className="mx-auto mb-4 h-10 w-10 text-gray-500 md:h-12 md:w-12" />
-                      <p className="mb-2 text-base text-gray-400 md:text-lg">no videos yet</p>
-                      <p className="mb-6 text-sm text-gray-500">
-                        upload films, music videos, or motion graphics
-                      </p>
-                      <motion.button
-                        onClick={() => openUploadModal("video")}
-                        className="inline-flex items-center gap-2 border border-white/40 px-6 py-2.5 transition-all duration-300 hover:border-white/60 hover:bg-white/10 md:px-8 md:py-3 touch-manipulation"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>upload your first video</span>
-                      </motion.button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {videoItems.map((item) => (
-                        <div key={item.id} className="border border-white/20 bg-white/5 p-5">
-                          <div className="mb-4 flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => openMediaItemPage(item)}
-                                className="text-left text-lg transition-colors hover:text-gray-300"
-                              >
-                                {item.title}
-                              </button>
-                              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-gray-500">
-                                {item.visibility.replace("_", " ")}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => openEditUploadModal(item)}
-                              className="flex items-center gap-2 border border-white/15 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 transition-colors hover:border-white/40 hover:text-white"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                              <span>edit upload</span>
-                            </button>
-                          </div>
-                          {item.asset?.url ? (
-                            <video controls className="mb-4 aspect-video w-full bg-black">
-                              <source src={item.asset.url} type={item.asset.mimeType} />
-                            </video>
-                          ) : (
-                            <div className="mb-4 aspect-video w-full bg-white/5" />
-                          )}
-                          <div className="mb-2 flex items-start justify-between gap-3">
-                            <span className="text-xs text-gray-500">{formatUploadDate(item.createdAt)}</span>
-                          </div>
-                          {item.description && (
-                            <p className="text-sm leading-relaxed text-gray-400">{item.description}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </div>
-          )
-        ) : (
-          <motion.div
-            className="border border-white/20 border-dashed p-12 md:p-16 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Upload className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-gray-500" />
-            <p className="text-gray-400 text-base md:text-lg mb-2">select content categories first</p>
-            <p className="text-gray-500 text-sm">
-              choose music, visual, or video in edit mode to start uploading content
-            </p>
-          </motion.div>
-        )}
-      </motion.div>
 
       {/* Change Password Modal */}
       {showChangePassword && (
@@ -1427,8 +1542,7 @@ export function MyProfile({
           onClose={() => setShowChangePassword(false)}
           onSuccess={() => {
             setShowChangePassword(false);
-            // Show success message (could add a toast notification here)
-            alert('password updated successfully');
+            setProfileNotice({ type: "success", message: "Password updated successfully." });
           }}
         />
       )}
@@ -1457,6 +1571,53 @@ export function MyProfile({
           onDelete={handleDeleteMediaItem}
         />
       )}
+
+      {avatarDraft ? (
+        <ImageCropModal
+          file={avatarDraft}
+          title="crop profile image"
+          description="Position your avatar inside the square frame. The final avatar stays tightly framed and clean across profile surfaces."
+          confirmLabel="use profile image"
+          shape="circle"
+          outputSize={800}
+          onClose={() => setAvatarDraft(null)}
+          onConfirm={uploadAvatarFile}
+        />
+      ) : null}
+
+      <VisualGalleryLightbox
+        profile={{
+          username: profileData.username,
+          displayName: profileData.displayName,
+        }}
+        items={lightboxItems}
+        currentIndex={lightboxState.index}
+        onClose={() => setLightboxState({ kind: "", index: -1 })}
+        onPrevious={() =>
+          setLightboxState((current) => ({
+            ...current,
+            index:
+              lightboxItems.length > 0
+                ? (current.index - 1 + lightboxItems.length) % lightboxItems.length
+                : -1,
+          }))
+        }
+        onNext={() =>
+          setLightboxState((current) => ({
+            ...current,
+            index: lightboxItems.length > 0 ? (current.index + 1) % lightboxItems.length : -1,
+          }))
+        }
+      />
+
+      {connectionsView ? (
+        <ProfileConnectionsModal
+          username={profileData.username}
+          displayName={profileData.displayName}
+          initialView={connectionsView}
+          onClose={() => setConnectionsView(null)}
+        />
+      ) : null}
     </motion.div>
   );
 }

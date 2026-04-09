@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ImageWithFallback } from "./figma/ImageWithFallback.tsx";
+import {
+  PAGE_TRANSITION,
+  SOFT_BUTTON_HOVER,
+  SOFT_BUTTON_TAP,
+  SOFT_CARD_HOVER,
+} from "@/lib/motion";
 
 const COPY_BY_CATEGORY = {
   music: {
@@ -73,15 +79,15 @@ export function BrowseCategoryArtists({ category, onArtistClick, onBack }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
+      transition={PAGE_TRANSITION}
     >
       <motion.button
         onClick={onBack}
         className="mb-6 md:mb-8 text-gray-400 hover:text-white transition-colors relative group inline-block touch-manipulation"
-        whileHover={{ x: -5 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ x: -3, ...SOFT_BUTTON_HOVER }}
+        whileTap={SOFT_BUTTON_TAP}
       >
         <span className="inline-block" aria-hidden="true">{"\u2190"}</span>
         <span className="ml-2">back</span>
@@ -89,7 +95,7 @@ export function BrowseCategoryArtists({ category, onArtistClick, onBack }) {
           className="absolute -bottom-1 left-0 h-px bg-white"
           initial={{ width: 0 }}
           whileHover={{ width: "100%" }}
-          transition={{ duration: 0.3 }}
+          transition={PAGE_TRANSITION}
         />
       </motion.button>
 
@@ -124,7 +130,7 @@ export function BrowseCategoryArtists({ category, onArtistClick, onBack }) {
           className="border border-white/20 border-dashed p-12 md:p-16 text-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.15 }}
+          transition={{ ...PAGE_TRANSITION, delay: 0.12 }}
         >
           <p className="text-gray-400 text-base md:text-lg mb-2">{copy.emptyTitle}</p>
           <p className="text-gray-500 text-sm">{copy.emptyDescription}</p>
@@ -141,9 +147,9 @@ export function BrowseCategoryArtists({ category, onArtistClick, onBack }) {
               className="border border-white/20 bg-white/5 p-5 text-left transition-colors hover:border-white/40 hover:bg-white/[0.08]"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.06 * index, duration: 0.35 }}
-              whileHover={{ y: -4 }}
-              whileTap={{ scale: 0.98 }}
+              transition={{ ...PAGE_TRANSITION, delay: 0.05 * index }}
+              whileHover={SOFT_CARD_HOVER}
+              whileTap={SOFT_BUTTON_TAP}
             >
               <div className="mb-4 aspect-[4/3] overflow-hidden border border-white/10 bg-black">
                 <ImageWithFallback

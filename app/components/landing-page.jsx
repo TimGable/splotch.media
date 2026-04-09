@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useRouter } from "next/navigation";
 import { SignIn } from "./sign-in";
 import { RequestInvite } from "./request-invite";
 import { BrowseArtists } from "./browse-artists";
@@ -7,31 +8,135 @@ import { BrowseVisualArtists } from "./browse-visual-artists";
 import { BrowseVideoArtists } from "./browse-video-artists";
 import { CategorySelector } from "./category-selector";
 import { InteractiveBackground } from "./interactive-background";
+import { buildPublicProfilePath } from "@/lib/media-slugs";
+import {
+  consumeInitialRootView,
+  getRootViewHistorySeed,
+  rememberRootViewReturn,
+} from "@/lib/public-navigation";
+import {
+  FADE_UP_ANIMATION,
+  PAGE_TRANSITION,
+  SOFT_BUTTON_HOVER,
+  SOFT_BUTTON_TAP,
+} from "@/lib/motion";
 
 export function LandingPage({ onSignIn, onForgotPassword }) {
+  const router = useRouter();
   const [showCategories, setShowCategories] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showSignIn, setShowSignIn] = useState(false);
   const [showRequestInvite, setShowRequestInvite] = useState(false);
   const [hoveredButton, setHoveredButton] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
+  const viewHistoryRef = useRef([]);
+
+  const getCurrentLandingView = () => {
+    if (showSignIn) return "sign-in";
+    if (showRequestInvite) return "request-invite";
+    if (selectedCategory === "music") return "browse-music";
+    if (selectedCategory === "visual") return "browse-visual";
+    if (selectedCategory === "video") return "browse-video";
+    if (showCategories) return "categories";
+    return "home";
+  };
+
+  const applyLandingView = (view) => {
+    setShowSignIn(view === "sign-in");
+    setShowRequestInvite(view === "request-invite");
+
+    if (view === "categories") {
+      setShowCategories(true);
+      setSelectedCategory(null);
+      return;
+    }
+
+    if (view === "browse-music") {
+      setShowCategories(false);
+      setSelectedCategory("music");
+      return;
+    }
+
+    if (view === "browse-visual") {
+      setShowCategories(false);
+      setSelectedCategory("visual");
+      return;
+    }
+
+    if (view === "browse-video") {
+      setShowCategories(false);
+      setSelectedCategory("video");
+      return;
+    }
+
+    setShowCategories(false);
+    setSelectedCategory(null);
+  };
+
+  const navigateLanding = (nextView, { recordHistory = true } = {}) => {
+    const currentView = getCurrentLandingView();
+    if (currentView === nextView) {
+      return;
+    }
+
+    if (recordHistory) {
+      const currentHistory = viewHistoryRef.current;
+      if (currentHistory[currentHistory.length - 1] !== currentView) {
+        viewHistoryRef.current = [...currentHistory, currentView];
+      }
+    }
+
+    applyLandingView(nextView);
+  };
+
+  const goBackLanding = (fallbackView = "home") => {
+    const currentHistory = viewHistoryRef.current;
+    const previousView = currentHistory[currentHistory.length - 1];
+
+    if (!previousView) {
+      applyLandingView(fallbackView);
+      return;
+    }
+
+    viewHistoryRef.current = currentHistory.slice(0, -1);
+    applyLandingView(previousView);
+  };
+
+  useEffect(() => {
+    const initialView = consumeInitialRootView();
+    if (!initialView) {
+      return;
+    }
+
+    viewHistoryRef.current = getRootViewHistorySeed(initialView);
+    navigateLanding(initialView, { recordHistory: false });
+  }, []);
+
+  const openPublicProfile = (artist, returnView) => {
+    if (typeof window === "undefined" || !artist?.username) {
+      return;
+    }
+
+    if (returnView) {
+      rememberRootViewReturn(returnView);
+    }
+
+    router.push(buildPublicProfilePath(artist.username));
+  };
 
   if (showSignIn) {
     return (
-      <SignIn 
-        onBack={() => setShowSignIn(false)} 
+      <SignIn
+        onBack={() => goBackLanding()}
         onSignIn={onSignIn}
         onForgotPassword={onForgotPassword}
-        onRequestInvite={() => {
-          setShowSignIn(false);
-          setShowRequestInvite(true);
-        }}
+        onRequestInvite={() => navigateLanding("request-invite")}
       />
     );
   }
 
   if (showRequestInvite) {
-    return <RequestInvite onBack={() => setShowRequestInvite(false)} />;
+    return <RequestInvite onBack={() => goBackLanding()} />;
   }
 
   return (
@@ -47,65 +152,57 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
             {selectedCategory === 'music' ? (
               <motion.div
                 key="music-browse"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
+                initial={FADE_UP_ANIMATION.initial}
+                animate={FADE_UP_ANIMATION.animate}
+                exit={FADE_UP_ANIMATION.exit}
+                transition={PAGE_TRANSITION}
               >
                 <BrowseArtists
-                  onArtistClick={(artist) => console.log('Artist clicked:', artist)}
-                  onBack={() => {
-                    setSelectedCategory(null);
-                    setShowCategories(true);
-                  }}
+                  onArtistClick={(artist) => openPublicProfile(artist, "browse-music")}
+                  onBack={() => goBackLanding("categories")}
                 />
               </motion.div>
             ) : selectedCategory === 'visual' ? (
               <motion.div
                 key="visual-browse"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
+                initial={FADE_UP_ANIMATION.initial}
+                animate={FADE_UP_ANIMATION.animate}
+                exit={FADE_UP_ANIMATION.exit}
+                transition={PAGE_TRANSITION}
               >
                 <BrowseVisualArtists
-                  onArtistClick={(artist) => console.log('Artist clicked:', artist)}
-                  onBack={() => {
-                    setSelectedCategory(null);
-                    setShowCategories(true);
-                  }}
+                  onArtistClick={(artist) => openPublicProfile(artist, "browse-visual")}
+                  onBack={() => goBackLanding("categories")}
                 />
               </motion.div>
             ) : selectedCategory === 'video' ? (
               <motion.div
                 key="video-browse"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
+                initial={FADE_UP_ANIMATION.initial}
+                animate={FADE_UP_ANIMATION.animate}
+                exit={FADE_UP_ANIMATION.exit}
+                transition={PAGE_TRANSITION}
               >
                 <BrowseVideoArtists
-                  onArtistClick={(artist) => console.log('Artist clicked:', artist)}
-                  onBack={() => {
-                    setSelectedCategory(null);
-                    setShowCategories(true);
-                  }}
+                  onArtistClick={(artist) => openPublicProfile(artist, "browse-video")}
+                  onBack={() => goBackLanding("categories")}
                 />
               </motion.div>
             ) : showCategories ? (
               <motion.div
                 key="categories"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
+                initial={FADE_UP_ANIMATION.initial}
+                animate={FADE_UP_ANIMATION.animate}
+                exit={FADE_UP_ANIMATION.exit}
+                transition={PAGE_TRANSITION}
               >
                 <CategorySelector
                   onCategorySelect={(category) => {
-                    setSelectedCategory(category);
-                    setShowCategories(false);
+                    if (category === "music") navigateLanding("browse-music");
+                    else if (category === "visual") navigateLanding("browse-visual");
+                    else if (category === "video") navigateLanding("browse-video");
                   }}
-                  onBack={() => setShowCategories(false)}
+                  onBack={() => goBackLanding("home")}
                   showBackButton={true}
                 />
               </motion.div>
@@ -113,19 +210,23 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
               <div className="text-center flex items-center justify-center min-h-[60vh]">
                 <motion.div
                   key="landing"
-                  initial={{ opacity: 0, x: -100 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 100 }}
-                  transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                  initial={FADE_UP_ANIMATION.initial}
+                  animate={FADE_UP_ANIMATION.animate}
+                  exit={FADE_UP_ANIMATION.exit}
+                  transition={PAGE_TRANSITION}
                 >
                   {/* Logo/Brand */}
                   <motion.div 
                     className="mb-16"
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                    transition={{ ...PAGE_TRANSITION, delay: 0.12 }}
                   >
                     <h1 className="text-4xl md:text-5xl lg:text-6xl tracking-tight mb-4">our media archive</h1>
+                    <p className="mx-auto max-w-2xl text-sm leading-relaxed text-gray-400 md:text-base">
+                      An invite-only archive for music, visual art, and video, built around artist-owned pages,
+                      persistent playback, and direct public sharing.
+                    </p>
                   </motion.div>
 
                   {/* CTA Buttons */}
@@ -133,20 +234,22 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                     className="flex flex-col items-center gap-4 md:gap-6 mb-16 max-w-md mx-auto w-full px-4"
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6, duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                    transition={{ ...PAGE_TRANSITION, delay: 0.2 }}
                   >
                     {/* Browse Artists - Big Button */}
                     <motion.button
-                      onClick={() => setShowCategories(true)}
+                      onClick={() => navigateLanding("categories")}
                       className="w-full group relative px-8 md:px-12 py-6 md:py-8 border-2 border-white overflow-hidden bg-transparent transition-all duration-300 active:scale-95 touch-manipulation"
                       onHoverStart={() => setHoveredButton('browse')}
                       onHoverEnd={() => setHoveredButton(null)}
+                      whileHover={SOFT_BUTTON_HOVER}
+                      whileTap={SOFT_BUTTON_TAP}
                     >
                       <motion.div 
                         className="absolute inset-0 bg-white"
                         initial={{ scaleX: 0 }}
                         animate={{ scaleX: hoveredButton === 'browse' ? 1 : 0 }}
-                        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                        transition={PAGE_TRANSITION}
                         style={{ originX: 0 }}
                       />
                       <motion.span 
@@ -155,7 +258,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                           color: hoveredButton === 'browse' ? '#000000' : '#ffffff',
                           letterSpacing: hoveredButton === 'browse' ? '0.1em' : '0.025em'
                         }}
-                        transition={{ duration: 0.3 }}
+                        transition={PAGE_TRANSITION}
                       >
                         Browse Artists
                       </motion.span>
@@ -166,11 +269,13 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                       className="w-full flex gap-3 md:gap-4"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: 0.8 }}
+                      transition={{ ...PAGE_TRANSITION, delay: 0.28 }}
                     >
                       <motion.button 
                         className="flex-1 group relative px-4 md:px-6 py-4 border border-white/40 overflow-hidden bg-white/5 hover:border-white/60 hover:bg-white/15 transition-all duration-200 active:scale-95 touch-manipulation"
-                        onClick={() => setShowSignIn(true)}
+                        onClick={() => navigateLanding("sign-in")}
+                        whileHover={SOFT_BUTTON_HOVER}
+                        whileTap={SOFT_BUTTON_TAP}
                       >
                         <span className="relative z-10 text-sm md:text-base tracking-wide text-white">
                           Sign In
@@ -179,13 +284,15 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                           className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
                           initial={{ scaleX: 0 }}
                           whileHover={{ scaleX: 1 }}
-                          transition={{ duration: 0.3 }}
+                          transition={PAGE_TRANSITION}
                         />
                       </motion.button>
                     
                       <motion.button 
                         className="flex-1 group relative px-4 md:px-6 py-4 border border-white/40 overflow-hidden bg-white/5 hover:border-white/60 hover:bg-white/15 transition-all duration-200 active:scale-95 touch-manipulation"
-                        onClick={() => setShowRequestInvite(true)}
+                        onClick={() => navigateLanding("request-invite")}
+                        whileHover={SOFT_BUTTON_HOVER}
+                        whileTap={SOFT_BUTTON_TAP}
                       >
                         <span className="relative z-10 text-sm md:text-base tracking-wide text-white">
                           Request Invite
@@ -194,7 +301,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                           className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"
                           initial={{ scaleX: 0 }}
                           whileHover={{ scaleX: 1 }}
-                          transition={{ duration: 0.3 }}
+                          transition={PAGE_TRANSITION}
                         />
                       </motion.button>
                     </motion.div>
@@ -205,7 +312,9 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                       className="relative group px-6 py-2 border border-white/20 hover:border-white/40 transition-all duration-300 overflow-hidden touch-manipulation"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.8, duration: 0.5 }}
+                      transition={{ ...PAGE_TRANSITION, delay: 0.32 }}
+                      whileHover={SOFT_BUTTON_HOVER}
+                      whileTap={SOFT_BUTTON_TAP}
                     >
                       <span className="relative z-10 text-xs md:text-sm tracking-widest text-gray-400 group-hover:text-white transition-colors">
                         {showAbout ? 'close' : 'about'}
@@ -214,7 +323,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                         className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5"
                         initial={{ x: '-100%' }}
                         whileHover={{ x: '100%' }}
-                        transition={{ duration: 0.6, ease: "easeInOut" }}
+                        transition={PAGE_TRANSITION}
                       />
                     </motion.button>
                   </motion.div>
@@ -228,8 +337,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ 
-                          duration: 0.6,
-                          ease: [0.33, 1, 0.68, 1]
+                          ...PAGE_TRANSITION,
                         }}
                       >
                         <motion.div 
@@ -238,8 +346,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                           animate={{ y: 0, opacity: 1 }}
                           exit={{ y: -10, opacity: 0 }}
                           transition={{ 
-                            duration: 0.5,
-                            ease: [0.33, 1, 0.68, 1],
+                            ...PAGE_TRANSITION,
                             delay: 0.1
                           }}
                         >
