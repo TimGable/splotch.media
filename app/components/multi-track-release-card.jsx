@@ -181,7 +181,7 @@ export function MultiTrackReleaseCard({
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2.5 whitespace-nowrap px-3 py-2 text-white focus:bg-white/10 focus:text-white">
                           <Share2 className="h-4 w-4 text-gray-400" />
-                          <span>share track</span>
+                          <span>share release</span>
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="w-[min(24rem,calc(100vw-3rem))] border-white/15 bg-black text-white">
                           <div className="space-y-3 p-2">

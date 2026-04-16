@@ -14,6 +14,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { ViewportPortal } from "./viewport-portal";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_CARD_HOVER, SOFT_PANEL_REVEAL } from "@/lib/motion";
 
@@ -55,6 +56,7 @@ export function GlobalAudioPlayer({
 }) {
   const router = useRouter();
   const audioRef = useRef(null);
+  const queueTriggerRef = useRef(null);
   const queuePanelRef = useRef(null);
   const [showQueue, setShowQueue] = useState(false);
   const coverArt = currentTrack?.release?.coverArt;
@@ -68,14 +70,17 @@ export function GlobalAudioPlayer({
     }
 
     const handlePointerDown = (event) => {
-      if (!queuePanelRef.current?.contains(event.target)) {
+      const clickedPanel = queuePanelRef.current?.contains(event.target);
+      const clickedTrigger = queueTriggerRef.current?.contains(event.target);
+
+      if (!clickedPanel && !clickedTrigger) {
         setShowQueue(false);
       }
     };
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [showQueue]);
 
@@ -119,9 +124,114 @@ export function GlobalAudioPlayer({
     );
   };
 
+  const queuePanel = (
+    <ViewportPortal>
+      <AnimatePresence>
+        {showQueue ? (
+          <motion.div
+            ref={queuePanelRef}
+            className="fixed inset-x-3 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] z-[80] max-h-[calc(100dvh-11rem)] overflow-hidden border border-white/15 bg-black/96 shadow-[0_18px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl md:bottom-24 md:left-auto md:right-6 md:w-[min(24rem,calc(100vw-2rem))]"
+            {...SOFT_PANEL_REVEAL}
+            transition={PAGE_TRANSITION}
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">
+                queue
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowQueue(false)}
+                className="flex h-8 w-8 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white md:hidden"
+                aria-label="Close queue"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="scrollbar-hidden max-h-[calc(100dvh-15rem)] overflow-y-auto md:max-h-[22rem]">
+              {playbackQueue?.length ? (
+                playbackQueue.map((entry, index) => {
+                  const isActiveEntry = index === queueIndex;
+
+                  return (
+                    <motion.div
+                      key={`${entry.track.id}-${index}`}
+                      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-white/10 px-3 py-3 last:border-b-0 md:flex md:gap-3 md:px-4 ${
+                        isActiveEntry ? "bg-white/[0.05]" : ""
+                      }`}
+                      whileHover={SOFT_CARD_HOVER}
+                      transition={PAGE_TRANSITION}
+                    >
+                      <motion.button
+                        type="button"
+                        onClick={() => {
+                          onQueueSelect?.(index);
+                          setShowQueue(false);
+                        }}
+                        className="min-w-0 text-left md:flex-1"
+                        whileHover={SOFT_BUTTON_HOVER}
+                        whileTap={SOFT_BUTTON_TAP}
+                        transition={PAGE_TRANSITION}
+                      >
+                        <p className="truncate text-sm text-white">{entry.track.title}</p>
+                        <p className="truncate text-[11px] uppercase tracking-[0.16em] text-gray-500">
+                          {entry.artist.name}
+                        </p>
+                      </motion.button>
+
+                      <div className="flex shrink-0 items-center gap-0.5 md:gap-1">
+                        <motion.button
+                          type="button"
+                          onClick={() => onQueueMove?.(index, index - 1)}
+                          disabled={index === 0}
+                          className="flex h-9 w-9 items-center justify-center text-gray-500 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30 md:h-8 md:w-8"
+                          aria-label={`Move ${entry.track.title} up`}
+                          whileHover={index === 0 ? undefined : SOFT_BUTTON_HOVER}
+                          whileTap={index === 0 ? undefined : SOFT_BUTTON_TAP}
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </motion.button>
+                        <motion.button
+                          type="button"
+                          onClick={() => onQueueMove?.(index, index + 1)}
+                          disabled={index === (playbackQueue?.length || 0) - 1}
+                          className="flex h-9 w-9 items-center justify-center text-gray-500 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30 md:h-8 md:w-8"
+                          aria-label={`Move ${entry.track.title} down`}
+                          whileHover={index === (playbackQueue?.length || 0) - 1 ? undefined : SOFT_BUTTON_HOVER}
+                          whileTap={index === (playbackQueue?.length || 0) - 1 ? undefined : SOFT_BUTTON_TAP}
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </motion.button>
+                        <motion.button
+                          type="button"
+                          onClick={() => onQueueRemove?.(index)}
+                          className="flex h-9 w-9 items-center justify-center text-gray-500 transition-colors hover:text-red-300 md:h-8 md:w-8"
+                          aria-label={`Remove ${entry.track.title}`}
+                          whileHover={SOFT_BUTTON_HOVER}
+                          whileTap={SOFT_BUTTON_TAP}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              ) : (
+                <div className="px-4 py-6 text-sm text-gray-500">queue is empty.</div>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </ViewportPortal>
+  );
+
   return (
     <motion.div
-      className={`fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-black/92 backdrop-blur-xl ${
+      className={`fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-black/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl ${
         isClosing ? "pointer-events-none" : ""
       }`}
       initial={{ y: 100, opacity: 0, filter: "blur(8px)" }}
@@ -157,13 +267,13 @@ export function GlobalAudioPlayer({
         />
       </div>
 
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-4 md:px-6">
-        <div className="flex min-w-0 flex-1 items-center gap-4">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 md:flex-row md:items-center md:gap-4 md:px-6 md:py-4">
+        <div className="flex min-w-0 items-center gap-3 pr-12 md:flex-1 md:gap-4 md:pr-0">
           <motion.button
             type="button"
             onClick={openCurrentTrackPage}
             disabled={!canOpenTrackPage}
-            className="h-14 w-14 flex-shrink-0 overflow-hidden border border-white/10 bg-white/5 transition-colors hover:border-white/35 disabled:cursor-default disabled:hover:border-white/10"
+            className="h-12 w-12 flex-shrink-0 overflow-hidden border border-white/10 bg-white/5 transition-colors hover:border-white/35 disabled:cursor-default disabled:hover:border-white/10 md:h-14 md:w-14"
             whileHover={canOpenTrackPage ? SOFT_CARD_HOVER : undefined}
             whileTap={canOpenTrackPage ? SOFT_BUTTON_TAP : undefined}
           >
@@ -198,7 +308,7 @@ export function GlobalAudioPlayer({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 md:gap-5">
+        <div className="grid grid-cols-[auto_auto_auto_auto_auto] items-center justify-center gap-2 md:flex md:gap-5">
           <span className="hidden w-12 text-right text-xs text-gray-500 md:block">
             {formatTime(currentTime)}
           </span>
@@ -239,7 +349,7 @@ export function GlobalAudioPlayer({
           <span className="hidden w-12 text-xs text-gray-500 md:block">{formatTime(duration)}</span>
         </div>
 
-        <div className="relative" ref={queuePanelRef}>
+        <div className="absolute right-3 top-3 md:static" ref={queueTriggerRef}>
           <motion.button
             type="button"
             onClick={() => setShowQueue((current) => !current)}
@@ -250,95 +360,6 @@ export function GlobalAudioPlayer({
           >
             <ListMusic className="h-4.5 w-4.5" />
           </motion.button>
-
-          <AnimatePresence>
-            {showQueue ? (
-              <motion.div
-                className="absolute bottom-14 right-0 z-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden border border-white/15 bg-black/96 shadow-[0_18px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-                {...SOFT_PANEL_REVEAL}
-                transition={PAGE_TRANSITION}
-              >
-                <div className="border-b border-white/10 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">
-                    queue
-                  </p>
-                </div>
-
-                <div className="scrollbar-hidden max-h-[22rem] overflow-y-auto">
-                  {playbackQueue?.length ? (
-                    playbackQueue.map((entry, index) => {
-                      const isActiveEntry = index === queueIndex;
-
-                      return (
-                        <motion.div
-                          key={`${entry.track.id}-${index}`}
-                          className={`flex items-center gap-3 border-b border-white/10 px-4 py-3 last:border-b-0 ${
-                            isActiveEntry ? "bg-white/[0.05]" : ""
-                          }`}
-                          whileHover={SOFT_CARD_HOVER}
-                          transition={PAGE_TRANSITION}
-                        >
-                          <motion.button
-                            type="button"
-                            onClick={() => {
-                              onQueueSelect?.(index);
-                              setShowQueue(false);
-                            }}
-                            className="min-w-0 flex-1 text-left"
-                            whileHover={SOFT_BUTTON_HOVER}
-                            whileTap={SOFT_BUTTON_TAP}
-                            transition={PAGE_TRANSITION}
-                          >
-                            <p className="truncate text-sm text-white">{entry.track.title}</p>
-                            <p className="truncate text-[11px] uppercase tracking-[0.16em] text-gray-500">
-                              {entry.artist.name}
-                            </p>
-                          </motion.button>
-
-                          <div className="flex items-center gap-1">
-                            <motion.button
-                              type="button"
-                              onClick={() => onQueueMove?.(index, index - 1)}
-                              disabled={index === 0}
-                              className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-                              aria-label={`Move ${entry.track.title} up`}
-                              whileHover={index === 0 ? undefined : SOFT_BUTTON_HOVER}
-                              whileTap={index === 0 ? undefined : SOFT_BUTTON_TAP}
-                            >
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </motion.button>
-                            <motion.button
-                              type="button"
-                              onClick={() => onQueueMove?.(index, index + 1)}
-                              disabled={index === (playbackQueue?.length || 0) - 1}
-                              className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-                              aria-label={`Move ${entry.track.title} down`}
-                              whileHover={index === (playbackQueue?.length || 0) - 1 ? undefined : SOFT_BUTTON_HOVER}
-                              whileTap={index === (playbackQueue?.length || 0) - 1 ? undefined : SOFT_BUTTON_TAP}
-                            >
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </motion.button>
-                            <motion.button
-                              type="button"
-                              onClick={() => onQueueRemove?.(index)}
-                              className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:text-red-300"
-                              aria-label={`Remove ${entry.track.title}`}
-                              whileHover={SOFT_BUTTON_HOVER}
-                              whileTap={SOFT_BUTTON_TAP}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </motion.button>
-                          </div>
-                        </motion.div>
-                      );
-                    })
-                  ) : (
-                    <div className="px-4 py-6 text-sm text-gray-500">queue is empty.</div>
-                  )}
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
@@ -378,8 +399,8 @@ export function GlobalAudioPlayer({
           </div>
         </div>
 
-        <div className="ml-auto flex min-w-[3.5rem] items-center justify-end gap-3 text-right text-[11px] uppercase tracking-[0.18em] text-gray-500">
-          <span>{formatTime(currentTime)}</span>
+        <div className="absolute bottom-3 right-3 flex items-center justify-end text-right text-[11px] uppercase tracking-[0.18em] text-gray-500 md:static md:ml-auto md:min-w-[3.5rem] md:gap-3">
+          <span className="hidden md:inline">{formatTime(currentTime)}</span>
 
           <motion.button
             type="button"
@@ -402,6 +423,7 @@ export function GlobalAudioPlayer({
           </motion.button>
         </div>
       </div>
+      {queuePanel}
     </motion.div>
   );
 }

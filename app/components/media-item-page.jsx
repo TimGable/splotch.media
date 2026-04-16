@@ -6,6 +6,7 @@ import { MediaSocialPanel } from "./media-social-panel";
 import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
 import { VideoPlayer } from "./video-player";
 import { MentionText } from "./mention-text";
+import { VisualImageFrame } from "./visual-image-frame";
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) {
@@ -241,13 +242,13 @@ export function MediaItemPage({
                 <button
                   type="button"
                   onClick={openPreviewLightbox}
-                  className="block w-full max-w-[42rem] cursor-pointer bg-black text-left"
+                  className="block w-full max-w-[42rem] cursor-pointer text-left"
                 >
                   {item.asset?.url ? (
-                    <img
+                    <VisualImageFrame
                       src={item.asset.url}
                       alt={displayTitle}
-                      className="max-h-[34rem] w-full object-contain"
+                      className="h-[min(34rem,72vw)] min-h-[18rem] w-full"
                     />
                   ) : (
                     <div className="flex min-h-[20rem] items-center justify-center">

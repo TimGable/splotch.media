@@ -12,6 +12,7 @@ import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
 import { EditUploadModal } from "./edit-upload-modal";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
+import { VisualImageFrame } from "./visual-image-frame";
 import { buildPublicMediaPath, buildPublicProfilePath } from "@/lib/media-slugs";
 import { createSupabaseBrowserClient, getStoredSupabaseUserId } from "@/lib/supabase/client";
 
@@ -637,13 +638,13 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                 <button
                   type="button"
                   onClick={openGallery}
-                  className="block w-full max-w-[42rem] cursor-pointer bg-black text-left"
+                  className="block w-full max-w-[42rem] cursor-pointer text-left"
                 >
                   {displayedItem.asset?.url ? (
-                    <img
+                    <VisualImageFrame
                       src={displayedItem.asset.url}
                       alt={displayTitle}
-                      className="max-h-[34rem] w-full object-contain"
+                      className="h-[min(34rem,72vw)] min-h-[18rem] w-full"
                     />
                   ) : (
                     <div className="flex min-h-[20rem] items-center justify-center">

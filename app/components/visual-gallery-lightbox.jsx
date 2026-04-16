@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Palette, Video, X } from "lucide-react";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
 import { ViewportPortal } from "./viewport-portal";
+import { VisualImageFrame } from "./visual-image-frame";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
 
 const SWIPE_THRESHOLD = 90;
@@ -137,7 +138,7 @@ export function VisualGalleryLightbox({
             </div>
 
             <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="relative flex min-h-[50vh] items-center justify-center overflow-hidden bg-black">
+              <div className="relative flex min-h-[50vh] items-center justify-center overflow-hidden bg-white/[0.02]">
                 {items.length > 1 && (
                   <>
                     <button
@@ -187,10 +188,11 @@ export function VisualGalleryLightbox({
                         allowFullscreen
                       />
                     ) : (
-                      <img
+                      <VisualImageFrame
                         src={item.asset.url}
                         alt={item.title}
-                        className="max-h-[78vh] w-full select-none object-contain"
+                        className="h-[78vh] w-full"
+                        imageClassName="select-none"
                         draggable={false}
                       />
                     ) : (
