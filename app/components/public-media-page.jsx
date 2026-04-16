@@ -131,6 +131,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
 
     return [...tracksById.values()].sort(sortReleaseTracks);
   }, [displayedItem, displayedPublicItems]);
+  const isMultiTrackRelease = collectionTracks.length > 1;
   const openEditModal = () => {
     const isMultiTrackRelease =
       displayedItem.mediaKind === "music" &&
@@ -501,6 +502,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                     </button>
                   </div>
 
+                  {!isMultiTrackRelease ? (
                   <div className="flex items-center gap-4">
                     <button
                       type="button"
@@ -536,8 +538,9 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                       </div>
                     </div>
                   </div>
+                  ) : null}
 
-                  {collectionTracks.length > 1 ? (
+                  {isMultiTrackRelease ? (
                     <div className="mt-6 border-t border-white/10 pt-4">
                       <div className="mb-3 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-gray-500">
                         <span>{collectionTracks.length} tracks</span>
@@ -548,11 +551,18 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                         {collectionTracks.map((track, index) => {
                           const isReleaseTrackActive = currentTrack?.track?.id === track.id;
                           const isReleaseTrackPlaying = isReleaseTrackActive && isPlaying;
+                          const releaseTrackDuration = isReleaseTrackActive ? duration : 0;
+                          const releaseTrackCurrentTime = isReleaseTrackActive ? currentTime : 0;
+                          const releaseTrackProgress =
+                            releaseTrackDuration > 0 ? releaseTrackCurrentTime / releaseTrackDuration : 0;
+                          const releaseTrackWaveformData = buildWaveformData(
+                            `${track.id}:${track.asset?.fileName || track.title}`,
+                          );
 
                           return (
                             <div
                               key={track.id}
-                              className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 border border-white/10 bg-black/20 px-3 py-2.5"
+                              className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 border border-white/10 bg-black/20 px-3 py-3"
                             >
                               <button
                                 type="button"
@@ -564,17 +574,33 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                                 {isReleaseTrackPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
                               </button>
 
-                              <Link
-                                href={buildPublicMediaPath(profile.username, track.slug)}
-                                className="min-w-0 transition-colors hover:text-gray-300"
-                              >
-                                <span className="block truncate text-sm">
-                                  {track.trackNumber || index + 1}. {track.title}
-                                </span>
-                                <span className="mt-0.5 block truncate text-[11px] uppercase tracking-[0.14em] text-gray-500">
-                                  {track.asset?.fileName || track.asset?.mimeType || "audio"}
-                                </span>
-                              </Link>
+                              <div className="min-w-0">
+                                <Link
+                                  href={buildPublicMediaPath(profile.username, track.slug)}
+                                  className="transition-colors hover:text-gray-300"
+                                >
+                                  <span className="block truncate text-sm">
+                                    {track.trackNumber || index + 1}. {track.title}
+                                  </span>
+                                  <span className="mt-0.5 block truncate text-[11px] uppercase tracking-[0.14em] text-gray-500">
+                                    {track.asset?.fileName || track.asset?.mimeType || "audio"}
+                                  </span>
+                                </Link>
+                                <div className="mt-2 overflow-hidden border border-white/10 bg-white/[0.02] px-2 py-1.5">
+                                  <Waveform
+                                    data={releaseTrackWaveformData}
+                                    audioUrl={track.asset?.url}
+                                    isPlaying={isReleaseTrackPlaying}
+                                    height={30}
+                                    progress={releaseTrackProgress}
+                                    currentTime={releaseTrackCurrentTime}
+                                    duration={releaseTrackDuration}
+                                    onSeek={isReleaseTrackActive ? handleSeek : undefined}
+                                    seekLabel={`Seek ${track.title}`}
+                                    disabled={!isReleaseTrackActive}
+                                  />
+                                </div>
+                              </div>
 
                               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-gray-500">
                                 {track.asset?.fileSizeBytes ? <span>{formatFileSize(track.asset.fileSizeBytes)}</span> : null}

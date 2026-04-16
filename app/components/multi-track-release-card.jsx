@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Check, Copy, Disc3, Edit2, Ellipsis, Heart, ListPlus, MessageCircle, Pause, Play, Share2 } from "lucide-react";
 import { MentionText } from "./mention-text";
+import { Waveform } from "./waveform";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,31 @@ function formatReleaseType(value) {
   if (value === "ep") return "EP";
   if (value === "album") return "Album";
   return "Release";
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash || 1;
+}
+
+function createSeededRandom(seed) {
+  let current = seed >>> 0;
+  return () => {
+    current = (current * 1664525 + 1013904223) >>> 0;
+    return current / 4294967296;
+  };
+}
+
+function buildWaveformData(seedSource) {
+  const random = createSeededRandom(hashString(seedSource));
+  return Array.from({ length: 56 }, (_, index) => {
+    const base = 20 + random() * 62;
+    const shaped = index % 10 === 0 ? base * 0.7 : base;
+    return Math.max(10, Math.min(95, Math.round(shaped)));
+  });
 }
 
 export function MultiTrackReleaseCard({
@@ -213,6 +239,15 @@ export function MultiTrackReleaseCard({
                       <span className="mt-0.5 block truncate text-[11px] uppercase tracking-[0.14em] text-gray-500">
                         {track.asset?.fileName || track.asset?.mimeType || "audio"}
                       </span>
+                      <div className="mt-2 overflow-hidden border border-white/10 bg-white/[0.02] px-2 py-1.5">
+                        <Waveform
+                          data={buildWaveformData(`${track.id}:${track.asset?.fileName || track.title}`)}
+                          audioUrl={track.asset?.url}
+                          isPlaying={isTrackPlaying}
+                          height={24}
+                          disabled
+                        />
+                      </div>
                     </button>
 
                     <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-gray-500">
