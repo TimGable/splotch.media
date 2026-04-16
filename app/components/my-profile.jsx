@@ -17,7 +17,7 @@ import { ProfileConnectionsModal } from "./profile-connections-modal";
 import { LikedTracksPanel } from "./liked-tracks-panel";
 import { attachPublicMediaSlugs, buildPublicMediaPath } from "@/lib/media-slugs";
 import { CONTENT_SWAP_ANIMATION, PAGE_TRANSITION, PROFILE_PANEL_SWAP_ANIMATION } from "@/lib/motion";
-import { uploadFormDataWithProgress } from "@/lib/upload-request";
+import { uploadMediaDirectToSupabase } from "@/lib/upload-request";
 
 const PROFILE_DETAIL_HISTORY_KEY = "__omaProfileDetail";
 
@@ -732,32 +732,17 @@ useEffect(() => {
         return;
       }
 
-      const body = new FormData();
-      body.append("mediaKind", mediaKind);
-      if (mediaKind === "music" && releaseType) {
-        body.append("releaseType", releaseType);
-      }
-      body.append("title", title);
-      body.append("description", description);
-      body.append("visibility", visibility);
-      if (mediaKind === "music" && releaseType && releaseType !== "single") {
-        for (const nextFile of files || []) {
-          body.append("file", nextFile);
-        }
-        for (const trackTitle of trackTitles || []) {
-          body.append("trackTitle", trackTitle);
-        }
-      } else if (file) {
-        body.append("file", file);
-      }
-      if (mediaKind === "music" && coverArt) {
-        body.append("coverArt", coverArt);
-      }
-
-      const payload = await uploadFormDataWithProgress({
-        url: "/api/media",
+      const payload = await uploadMediaDirectToSupabase({
         token: session.access_token,
-        body,
+        mediaKind,
+        releaseType,
+        title,
+        description,
+        visibility,
+        file,
+        files,
+        trackTitles,
+        coverArt,
         onProgress: setUploadProgress,
       });
 

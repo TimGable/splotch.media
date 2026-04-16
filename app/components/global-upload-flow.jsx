@@ -6,7 +6,7 @@ import { UploadCategoryModal } from "./upload-category-modal";
 import { UploadContentModal } from "./upload-content-modal";
 import { UploadProgressModal } from "./upload-progress-modal";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { uploadFormDataWithProgress } from "@/lib/upload-request";
+import { uploadMediaDirectToSupabase } from "@/lib/upload-request";
 
 export function GlobalUploadFlow({
   isOpen,
@@ -55,34 +55,17 @@ export function GlobalUploadFlow({
         throw new Error("Session expired. Please sign in again before uploading.");
       }
 
-      const body = new FormData();
-      body.append("mediaKind", mediaKind);
-      if (mediaKind === "music" && releaseType) {
-        body.append("releaseType", releaseType);
-      }
-      body.append("title", title);
-      body.append("description", description);
-      body.append("visibility", visibility);
-
-      if (mediaKind === "music" && releaseType && releaseType !== "single") {
-        for (const nextFile of files || []) {
-          body.append("file", nextFile);
-        }
-        for (const trackTitle of trackTitles || []) {
-          body.append("trackTitle", trackTitle);
-        }
-      } else if (file) {
-        body.append("file", file);
-      }
-
-      if (mediaKind === "music" && coverArt) {
-        body.append("coverArt", coverArt);
-      }
-
-      const payload = await uploadFormDataWithProgress({
-        url: "/api/media",
+      const payload = await uploadMediaDirectToSupabase({
         token: session.access_token,
-        body,
+        mediaKind,
+        releaseType,
+        title,
+        description,
+        visibility,
+        file,
+        files,
+        trackTitles,
+        coverArt,
         onProgress: setUploadProgress,
       });
 
