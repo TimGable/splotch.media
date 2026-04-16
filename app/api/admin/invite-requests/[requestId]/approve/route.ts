@@ -5,6 +5,7 @@ import {
   createSupabaseServiceRoleClient,
 } from "@/lib/supabase/server";
 import {
+  getEmailDeliveryErrorMessage,
   isEmailNotificationsEnabled,
   sendApprovedInviteLinkEmail,
 } from "@/lib/notifications/email";
@@ -246,10 +247,17 @@ export async function POST(request: Request, { params }: Params) {
         }
 
         generatedActionLink = linkData.properties.action_link;
-        await sendApprovedInviteLinkEmail({
-          recipientEmail: inviteRequest.email,
-          actionLink: generatedActionLink,
-        });
+        try {
+          await sendApprovedInviteLinkEmail({
+            recipientEmail: inviteRequest.email,
+            actionLink: generatedActionLink,
+          });
+        } catch (mailError) {
+          return NextResponse.json(
+            { error: getEmailDeliveryErrorMessage(mailError) },
+            { status: 500 },
+          );
+        }
         sentViaResendFallback = true;
       } else {
         const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(
@@ -257,12 +265,51 @@ export async function POST(request: Request, { params }: Params) {
           { redirectTo },
         );
         if (recoveryError) {
+          if (isEmailRateLimitAuthError(recoveryError.message || "") && isEmailNotificationsEnabled()) {
+            linkType = "recovery";
+            const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+              type: linkType,
+              email: inviteRequest.email,
+              options: { redirectTo },
+            });
+
+            if (linkError || !linkData?.properties?.action_link) {
+              return NextResponse.json(
+                { error: `Failed to generate fallback recovery link: ${linkError?.message || "Unknown error."}` },
+                { status: 500 },
+              );
+            }
+
+            generatedActionLink = linkData.properties.action_link;
+            try {
+              await sendApprovedInviteLinkEmail({
+                recipientEmail: inviteRequest.email,
+                actionLink: generatedActionLink,
+              });
+            } catch (mailError) {
+              return NextResponse.json(
+                { error: getEmailDeliveryErrorMessage(mailError) },
+                { status: 500 },
+              );
+            }
+            sentViaResendFallback = true;
+          } else if (isEmailRateLimitAuthError(recoveryError.message || "")) {
+            return NextResponse.json(
+              {
+                error:
+                  "Recovery email rate limit exceeded. Configure RESEND_API_KEY, FROM_EMAIL, and NOTIFY_OWNER_EMAIL to use fallback delivery.",
+              },
+              { status: 429 },
+            );
+          } else {
           return NextResponse.json(
             { error: `Failed to send recovery email: ${recoveryError.message}` },
             { status: 500 },
           );
+          }
+        } else {
+          linkType = "recovery";
         }
-        linkType = "recovery";
       }
     }
 

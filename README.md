@@ -71,8 +71,18 @@ Required variables:
 - `RESEND_API_KEY` (optional; enables admin email notifications)
 - `FROM_EMAIL` (optional; sender identity for app emails)
 - `NOTIFY_OWNER_EMAIL` (optional; receives invite request notifications)
+- `NOTIFY_INVITE_REQUEST_EMAILS` (optional; comma-separated admin/moderator emails that receive invite approval links; falls back to `NOTIFY_OWNER_EMAIL`)
 
 On Vercel, set `APP_BASE_URL=https://splotchmedia.com` in Project Settings -> Environment Variables for Production. If it is omitted, the app falls back to Vercel's deployment URL environment variables, then to `http://localhost:3000` for local development.
+
+For deployed invite approval emails:
+
+- Set the Supabase variables in Vercel so API routes can read/write `invite_requests`, `invites`, and `users`.
+- Set `RESEND_API_KEY`, `FROM_EMAIL`, and `NOTIFY_INVITE_REQUEST_EMAILS` in Vercel. Resend only sends the email; the Vercel API route handles the database update when a moderator clicks approve or deny.
+- In Resend, verify `splotchmedia.com` and use a sender on that domain, for example `Our Media Archive <invites@splotchmedia.com>`.
+- In Supabase Auth settings, set the site URL to `https://splotchmedia.com` and add `https://splotchmedia.com/create-password` to allowed redirect URLs.
+
+`NOTIFY_INVITE_REQUEST_EMAILS=1timgable@gmail.com` is fine for receiving moderator approval emails. It does not make Resend able to send approved invite links to other people. To send invite approvals to requester emails, Resend requires a verified sender domain and a `FROM_EMAIL` on that domain.
 
 2. In Supabase SQL Editor, run schema:
 

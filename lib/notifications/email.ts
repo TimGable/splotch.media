@@ -2,14 +2,35 @@ import { Resend } from "resend";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const NOTIFY_OWNER_EMAIL = process.env.NOTIFY_OWNER_EMAIL;
+const NOTIFY_INVITE_REQUEST_EMAILS = process.env.NOTIFY_INVITE_REQUEST_EMAILS;
 const FROM_EMAIL = process.env.FROM_EMAIL;
 
+function getInviteNotificationRecipients() {
+  const rawRecipients = NOTIFY_INVITE_REQUEST_EMAILS || NOTIFY_OWNER_EMAIL || "";
+  return rawRecipients
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+}
+
 function hasEmailConfig() {
-  return Boolean(RESEND_API_KEY && NOTIFY_OWNER_EMAIL && FROM_EMAIL);
+  return Boolean(RESEND_API_KEY && FROM_EMAIL && getInviteNotificationRecipients().length > 0);
 }
 
 export function isEmailNotificationsEnabled() {
   return hasEmailConfig();
+}
+
+export function getEmailDeliveryErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Email delivery failed.";
+  if (message.toLowerCase().includes("only send testing emails")) {
+    return [
+      message,
+      "Resend is still in testing mode for this sender. Verify splotchmedia.com in Resend, then set FROM_EMAIL to an address on that domain, such as Our Media Archive <invites@splotchmedia.com>.",
+    ].join(" ");
+  }
+
+  return message;
 }
 
 async function sendEmailOrThrow(
@@ -72,7 +93,7 @@ export async function sendInviteRequestNotification(params: {
 
   await sendEmailOrThrow(resend, {
     from: FROM_EMAIL as string,
-    to: [NOTIFY_OWNER_EMAIL as string],
+    to: getInviteNotificationRecipients(),
     subject,
     text,
     html,

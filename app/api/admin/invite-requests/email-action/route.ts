@@ -4,6 +4,7 @@ import {
   createSupabaseServiceRoleClient,
 } from "@/lib/supabase/server";
 import {
+  getEmailDeliveryErrorMessage,
   isEmailNotificationsEnabled,
   sendApprovedInviteLinkEmail,
   sendDeniedInviteEmail,
@@ -155,10 +156,14 @@ export async function GET(request: Request) {
         }
 
         generatedActionLink = linkData.properties.action_link;
-        await sendApprovedInviteLinkEmail({
-          recipientEmail: inviteRequest.email,
-          actionLink: generatedActionLink,
-        });
+        try {
+          await sendApprovedInviteLinkEmail({
+            recipientEmail: inviteRequest.email,
+            actionLink: generatedActionLink,
+          });
+        } catch (mailError) {
+          throw new Error(getEmailDeliveryErrorMessage(mailError));
+        }
         sentViaResendFallback = true;
       } else {
         const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(
@@ -166,9 +171,38 @@ export async function GET(request: Request) {
           { redirectTo },
         );
         if (recoveryError) {
+          if (isEmailRateLimitAuthError(recoveryError.message || "") && isEmailNotificationsEnabled()) {
+            linkType = "recovery";
+            const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+              type: linkType,
+              email: inviteRequest.email,
+              options: { redirectTo },
+            });
+
+            if (linkError || !linkData?.properties?.action_link) {
+              throw new Error(`Failed to generate fallback recovery link: ${linkError?.message || "Unknown error."}`);
+            }
+
+            generatedActionLink = linkData.properties.action_link;
+            try {
+              await sendApprovedInviteLinkEmail({
+                recipientEmail: inviteRequest.email,
+                actionLink: generatedActionLink,
+              });
+            } catch (mailError) {
+              throw new Error(getEmailDeliveryErrorMessage(mailError));
+            }
+            sentViaResendFallback = true;
+          } else if (isEmailRateLimitAuthError(recoveryError.message || "")) {
+            throw new Error(
+              "Recovery email rate limit exceeded and Resend fallback is not configured. Set RESEND_API_KEY, FROM_EMAIL, and NOTIFY_OWNER_EMAIL.",
+            );
+          } else {
           throw new Error(`Failed to send recovery email: ${recoveryError.message}`);
+          }
+        } else {
+          linkType = "recovery";
         }
-        linkType = "recovery";
       }
     }
 
