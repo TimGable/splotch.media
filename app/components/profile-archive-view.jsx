@@ -578,18 +578,14 @@ export function ProfileArchiveView({
 
                         <div className="mb-4">
                           {item.asset?.url ? (
-                            <button
-                              type="button"
-                              onClick={() => (onOpenVideo ? onOpenVideo(item) : onOpenItem(item))}
-                              className="block w-full text-left"
-                            >
+                            <div className="w-full">
                               <VideoPlayer
                                 src={item.asset.url}
                                 poster={item.coverAsset?.url || ""}
                                 className="w-full border border-white/10"
                                 allowFullscreen
                               />
-                            </button>
+                            </div>
                           ) : (
                             <div className="aspect-video w-full border border-white/10 bg-white/5" />
                           )}
