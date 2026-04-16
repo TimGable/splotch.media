@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildPublicMediaPath, buildPublicProfilePath, slugifyMediaTitle } from "@/lib/media-slugs";
+import { attachPublicMediaSlugs, buildPublicMediaPath, buildPublicProfilePath, slugifyMediaTitle } from "@/lib/media-slugs";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const RESULT_LIMIT = 6;
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
     const titleMatchesPromise = supabase
       .from("media_items")
-      .select("id, owner_user_id, media_kind, title, description, created_at, visibility, state")
+      .select("id, owner_user_id, collection_id, media_kind, music_release_type, title, description, created_at, visibility, state")
       .eq("state", "ready")
       .in("visibility", ["public", "unlisted"])
       .or(`title.ilike.${likePattern},description.ilike.${likePattern}`)
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       artistUserIds.length > 0
         ? supabase
             .from("media_items")
-            .select("id, owner_user_id, media_kind, title, description, created_at, visibility, state")
+            .select("id, owner_user_id, collection_id, media_kind, music_release_type, title, description, created_at, visibility, state")
             .eq("state", "ready")
             .in("visibility", ["public", "unlisted"])
             .in("owner_user_id", artistUserIds)
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
     const allOwnerMediaTitles = ownerIds.length > 0
       ? await supabase
           .from("media_items")
-          .select("id, owner_user_id, title")
+          .select("id, owner_user_id, collection_id, music_release_type, title")
           .eq("state", "ready")
           .in("visibility", ["public", "unlisted"])
           .in("owner_user_id", ownerIds)
@@ -147,24 +147,47 @@ export async function GET(request: Request) {
       throw new Error(allOwnerMediaTitles.error.message);
     }
 
-    const slugByMediaId = new Map<string, string>();
-    const titlesByOwner = new Map<string, { id: string; title: string }[]>();
-    for (const item of allOwnerMediaTitles.data ?? []) {
-      titlesByOwner.set(item.owner_user_id, [...(titlesByOwner.get(item.owner_user_id) ?? []), item]);
+    const collectionIds = [
+      ...new Set(
+        (allOwnerMediaTitles.data ?? [])
+          .map((item) => item.collection_id)
+          .filter(Boolean),
+      ),
+    ];
+    const collectionTitleById = new Map<string, string>();
+    if (collectionIds.length > 0) {
+      const { data: collections, error: collectionsError } = await supabase
+        .from("media_collections")
+        .select("id, title")
+        .in("id", collectionIds);
+
+      if (collectionsError) {
+        throw new Error(collectionsError.message);
+      }
+
+      for (const collection of collections ?? []) {
+        collectionTitleById.set(collection.id, collection.title);
+      }
     }
 
-    for (const [ownerId, items] of titlesByOwner.entries()) {
-      const baseSlugCounts = new Map<string, number>();
-      for (const item of items) {
-        const baseSlug = slugifyMediaTitle(item.title);
-        baseSlugCounts.set(baseSlug, (baseSlugCounts.get(baseSlug) || 0) + 1);
-      }
-      for (const item of items) {
-        const baseSlug = slugifyMediaTitle(item.title);
-        slugByMediaId.set(
-          item.id,
-          (baseSlugCounts.get(baseSlug) || 0) > 1 ? `${baseSlug}-${item.id.slice(0, 8)}` : baseSlug,
-        );
+    const slugByMediaId = new Map<string, string>();
+    const titlesByOwner = new Map<string, Array<{ id: string; title: string; collectionId: string | null; collectionTitle: string | null; releaseType: string | null }>>();
+    for (const item of allOwnerMediaTitles.data ?? []) {
+      titlesByOwner.set(item.owner_user_id, [
+        ...(titlesByOwner.get(item.owner_user_id) ?? []),
+        {
+          id: item.id,
+          title: item.title,
+          collectionId: item.collection_id,
+          collectionTitle: item.collection_id ? collectionTitleById.get(item.collection_id) || null : null,
+          releaseType: item.music_release_type,
+        },
+      ]);
+    }
+
+    for (const items of titlesByOwner.values()) {
+      for (const item of attachPublicMediaSlugs(items)) {
+        slugByMediaId.set(item.id, item.slug);
       }
     }
 

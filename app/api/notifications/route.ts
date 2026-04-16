@@ -113,6 +113,8 @@ export async function GET(request: Request) {
         title: string;
         mediaKind: string;
         ownerUserId: string;
+        collectionId?: string | null;
+        releaseType?: string | null;
         slug?: string;
       }
     >();
@@ -148,7 +150,7 @@ export async function GET(request: Request) {
     if (mediaItemIds.length > 0) {
       const { data: mediaItems, error: mediaItemsError } = await supabase
         .from("media_items")
-        .select("id, title, media_kind, owner_user_id")
+        .select("id, title, media_kind, owner_user_id, collection_id, music_release_type")
         .in("id", mediaItemIds);
 
       if (mediaItemsError) {
@@ -160,6 +162,8 @@ export async function GET(request: Request) {
           title: item.title,
           mediaKind: item.media_kind,
           ownerUserId: item.owner_user_id,
+          collectionId: item.collection_id,
+          releaseType: item.music_release_type,
         });
       }
 
@@ -180,7 +184,7 @@ export async function GET(request: Request) {
 
         const { data: ownerMediaItems, error: ownerMediaItemsError } = await supabase
           .from("media_items")
-          .select("id, owner_user_id, title")
+          .select("id, owner_user_id, collection_id, music_release_type, title")
           .in("owner_user_id", ownerIds)
           .in("visibility", ["public", "unlisted"])
           .eq("state", "ready");
@@ -189,11 +193,36 @@ export async function GET(request: Request) {
           return NextResponse.json({ error: ownerMediaItemsError.message }, { status: 500 });
         }
 
+        const collectionIds = [
+          ...new Set((ownerMediaItems ?? []).map((item) => item.collection_id).filter(Boolean)),
+        ];
+        const collectionTitleById = new Map<string, string>();
+        if (collectionIds.length > 0) {
+          const { data: collections, error: collectionsError } = await supabase
+            .from("media_collections")
+            .select("id, title")
+            .in("id", collectionIds);
+
+          if (collectionsError) {
+            return NextResponse.json({ error: collectionsError.message }, { status: 500 });
+          }
+
+          for (const collection of collections ?? []) {
+            collectionTitleById.set(collection.id, collection.title);
+          }
+        }
+
         const mediaSlugMap = new Map<string, string>();
         for (const ownerId of ownerIds) {
           const ownerItems = (ownerMediaItems ?? []).filter((item) => item.owner_user_id === ownerId);
           for (const ownerItem of attachPublicMediaSlugs(
-            ownerItems.map((item) => ({ id: item.id, title: item.title })),
+            ownerItems.map((item) => ({
+              id: item.id,
+              title: item.title,
+              collectionId: item.collection_id,
+              collectionTitle: item.collection_id ? collectionTitleById.get(item.collection_id) || null : null,
+              releaseType: item.music_release_type,
+            })),
           )) {
             mediaSlugMap.set(ownerItem.id, ownerItem.slug);
           }

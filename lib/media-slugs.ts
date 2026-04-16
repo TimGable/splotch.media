@@ -13,21 +13,46 @@ export function slugifyMediaTitle(value: string) {
   return normalized || "untitled";
 }
 
-export function attachPublicMediaSlugs<T extends { id: string; title: string }>(items: T[]) {
+function getMediaSlugIdentity(item: { id: string; title: string; collectionId?: string | null; collectionTitle?: string | null; releaseType?: string | null }) {
+  const isMultiTrackRelease = item.collectionId && item.releaseType && item.releaseType !== "single";
+  if (!isMultiTrackRelease) {
+    return {
+      id: item.id,
+      title: item.title,
+    };
+  }
+
+  return {
+    id: item.collectionId || item.id,
+    title: item.collectionTitle || item.title,
+  };
+}
+
+export function attachPublicMediaSlugs<
+  T extends {
+    id: string;
+    title: string;
+    collectionId?: string | null;
+    collectionTitle?: string | null;
+    releaseType?: string | null;
+  },
+>(items: T[]) {
   const baseSlugCounts = new Map<string, number>();
 
   for (const item of items) {
-    const baseSlug = slugifyMediaTitle(item.title);
+    const slugIdentity = getMediaSlugIdentity(item);
+    const baseSlug = slugifyMediaTitle(slugIdentity.title);
     baseSlugCounts.set(baseSlug, (baseSlugCounts.get(baseSlug) || 0) + 1);
   }
 
   return items.map((item) => {
-    const baseSlug = slugifyMediaTitle(item.title);
+    const slugIdentity = getMediaSlugIdentity(item);
+    const baseSlug = slugifyMediaTitle(slugIdentity.title);
     const hasCollision = (baseSlugCounts.get(baseSlug) || 0) > 1;
 
     return {
       ...item,
-      slug: hasCollision ? `${baseSlug}-${item.id.slice(0, 8)}` : baseSlug,
+      slug: hasCollision ? `${baseSlug}-${slugIdentity.id.slice(0, 8)}` : baseSlug,
     };
   });
 }

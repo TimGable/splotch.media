@@ -285,7 +285,7 @@ async function loadLikedTracks(
   const { data: mediaItems, error: mediaItemsError } = await supabase
     .from("media_items")
     .select(
-      "id, owner_user_id, title, media_kind, visibility, state, published_at, primary_asset_id",
+      "id, owner_user_id, collection_id, music_release_type, title, media_kind, visibility, state, published_at, primary_asset_id",
     )
     .in("id", mediaItemIds)
     .eq("media_kind", "music")
@@ -347,7 +347,7 @@ async function loadLikedTracks(
   const slugMap = new Map<string, string>();
   const { data: ownerPublicItems, error: ownerPublicItemsError } = await supabase
     .from("media_items")
-    .select("id, owner_user_id, title")
+    .select("id, owner_user_id, collection_id, music_release_type, title")
     .in("owner_user_id", ownerIds)
     .eq("media_kind", "music")
     .eq("visibility", "public")
@@ -357,10 +357,35 @@ async function loadLikedTracks(
     throw new Error(ownerPublicItemsError.message);
   }
 
+  const ownerPublicCollectionIds = [
+    ...new Set((ownerPublicItems ?? []).map((item) => item.collection_id).filter(Boolean)),
+  ];
+  const ownerPublicCollectionTitleById = new Map<string, string>();
+  if (ownerPublicCollectionIds.length > 0) {
+    const { data: collections, error: collectionsError } = await supabase
+      .from("media_collections")
+      .select("id, title")
+      .in("id", ownerPublicCollectionIds);
+
+    if (collectionsError) {
+      throw new Error(collectionsError.message);
+    }
+
+    for (const collection of collections ?? []) {
+      ownerPublicCollectionTitleById.set(collection.id, collection.title);
+    }
+  }
+
   for (const ownerId of ownerIds) {
     const ownerItems = (ownerPublicItems ?? []).filter((item) => item.owner_user_id === ownerId);
     for (const ownerItem of attachPublicMediaSlugs(
-      ownerItems.map((item) => ({ id: item.id, title: item.title })),
+      ownerItems.map((item) => ({
+        id: item.id,
+        title: item.title,
+        collectionId: item.collection_id,
+        collectionTitle: item.collection_id ? ownerPublicCollectionTitleById.get(item.collection_id) || null : null,
+        releaseType: item.music_release_type,
+      })),
     )) {
       slugMap.set(ownerItem.id, ownerItem.slug);
     }
@@ -415,7 +440,16 @@ export async function getPublicMediaPageData(username: string, mediaSlug: string
   }
 
   const items = await loadMediaItems(base.supabase, base.profile.userId, ["public", "unlisted"]);
-  const item = items.find((entry) => entry.slug === String(mediaSlug || "").trim());
+  const matchingItems = items.filter((entry) => entry.slug === String(mediaSlug || "").trim());
+  const item = matchingItems.sort((first, second) => {
+    const firstTrackNumber = first.trackNumber ?? Number.MAX_SAFE_INTEGER;
+    const secondTrackNumber = second.trackNumber ?? Number.MAX_SAFE_INTEGER;
+    if (firstTrackNumber !== secondTrackNumber) {
+      return firstTrackNumber - secondTrackNumber;
+    }
+
+    return new Date(first.createdAt || 0).getTime() - new Date(second.createdAt || 0).getTime();
+  })[0];
 
   if (!item) {
     return null;

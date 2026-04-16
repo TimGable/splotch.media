@@ -83,7 +83,9 @@ export function RequestInvite({ onBack }) {
                   <h1 className="text-3xl md:text-5xl">request an invite</h1>
                   <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-400 md:text-base">
                     Tell us who you are and why you want access. If a previous request stalled or never
-                    reached you, submitting a new one with the same email will replace the older pending request.
+                    reached you, submitting a new one with the same email will replace the older pending
+                    request. Approved requests must be deleted by the owner before that email can request
+                    another invite.
                   </p>
                 </div>
 

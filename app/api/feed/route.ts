@@ -26,6 +26,8 @@ type FeedMediaItemRow = {
 type FeedSlugRow = {
   id: string;
   owner_user_id: string;
+  collection_id: string | null;
+  music_release_type: string | null;
   title: string;
 };
 
@@ -132,7 +134,7 @@ export async function GET(request: Request) {
 
     const { data: slugRows, error: slugRowsError } = await supabase
       .from("media_items")
-      .select("id, owner_user_id, title")
+      .select("id, owner_user_id, collection_id, music_release_type, title")
       .eq("state", "ready")
       .in("visibility", ["public", "unlisted"])
       .in("owner_user_id", ownerIds.length > 0 ? ownerIds : ["00000000-0000-0000-0000-000000000000"]);
@@ -152,23 +154,6 @@ export async function GET(request: Request) {
         },
       ]),
     );
-
-    const slugByItemId = new Map<string, string>();
-    const slugRowsByOwnerId = new Map<string, FeedSlugRow[]>();
-
-    for (const slugRow of slugRows ?? []) {
-      if (!slugRowsByOwnerId.has(slugRow.owner_user_id)) {
-        slugRowsByOwnerId.set(slugRow.owner_user_id, []);
-      }
-
-      slugRowsByOwnerId.get(slugRow.owner_user_id)?.push(slugRow);
-    }
-
-    for (const ownerRows of slugRowsByOwnerId.values()) {
-      for (const item of attachPublicMediaSlugs(ownerRows)) {
-        slugByItemId.set(item.id, item.slug);
-      }
-    }
 
     const itemIds = (mediaItems ?? []).map((item) => item.id);
     const avatarAssetIds = (profiles ?? [])
@@ -298,6 +283,31 @@ export async function GET(request: Request) {
 
       for (const collection of collections ?? []) {
         collectionTitleById.set(collection.id, collection.title);
+      }
+    }
+
+    const slugByItemId = new Map<string, string>();
+    const slugRowsByOwnerId = new Map<string, FeedSlugRow[]>();
+
+    for (const slugRow of slugRows ?? []) {
+      if (!slugRowsByOwnerId.has(slugRow.owner_user_id)) {
+        slugRowsByOwnerId.set(slugRow.owner_user_id, []);
+      }
+
+      slugRowsByOwnerId.get(slugRow.owner_user_id)?.push(slugRow);
+    }
+
+    for (const ownerRows of slugRowsByOwnerId.values()) {
+      for (const item of attachPublicMediaSlugs(
+        ownerRows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          collectionId: row.collection_id,
+          collectionTitle: row.collection_id ? collectionTitleById.get(row.collection_id) || null : null,
+          releaseType: row.music_release_type,
+        })),
+      )) {
+        slugByItemId.set(item.id, item.slug);
       }
     }
 

@@ -40,6 +40,27 @@ export async function POST(request: Request) {
     const supabase = createSupabaseServiceRoleClient();
     const nowIso = new Date().toISOString();
 
+    const { data: existingApprovedRequests, error: existingApprovedError } = await supabase
+      .from("invite_requests")
+      .select("id")
+      .eq("email", email)
+      .eq("status", "approved")
+      .limit(1);
+
+    if (existingApprovedError) {
+      return NextResponse.json({ error: existingApprovedError.message }, { status: 500 });
+    }
+
+    if ((existingApprovedRequests ?? []).length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "This email already has an approved invite request. The owner must delete the previous request before you can submit another one.",
+        },
+        { status: 409 },
+      );
+    }
+
     const { data: existingPendingRequests, error: existingPendingError } = await supabase
       .from("invite_requests")
       .select("id")
