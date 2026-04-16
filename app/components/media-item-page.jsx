@@ -250,16 +250,17 @@ export function MediaItemPage({
             )}
 
             {item.mediaKind === "video" && (
-              <div className="flex justify-center p-5 md:p-8">
+              <div className="flex justify-center p-3 sm:p-5 md:p-8">
                 {item.asset?.url ? (
                   <VideoPlayer
                     src={item.asset.url}
                     poster={item.coverAsset?.url || ""}
-                    className="w-full max-w-[42rem]"
+                    className="w-full max-w-[22rem] sm:max-w-[34rem] md:max-w-[42rem]"
+                    ratioClass="aspect-[4/5] sm:aspect-video"
                     allowFullscreen
                   />
                 ) : (
-                  <div className="flex min-h-[20rem] w-full max-w-[42rem] items-center justify-center border border-white/10 bg-black">
+                  <div className="flex aspect-[4/5] w-full max-w-[22rem] items-center justify-center border border-white/10 bg-black sm:aspect-video sm:max-w-[34rem] md:max-w-[42rem]">
                     <Video className="h-16 w-16 text-white/25" />
                   </div>
                 )}

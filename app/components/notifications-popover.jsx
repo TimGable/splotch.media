@@ -43,6 +43,11 @@ function getNotificationText(notification) {
   return `${actorName} liked ${notification.media?.title || "your post"}`;
 }
 
+function getActorInitial(notification) {
+  const label = notification.actor?.displayName || notification.actor?.username || "?";
+  return label.charAt(0).toUpperCase();
+}
+
 export function NotificationsPopover({ compact = false, onNavigate }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -224,8 +229,21 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
                     whileHover={SOFT_BUTTON_HOVER}
                     whileTap={SOFT_BUTTON_TAP}
                   >
-                    <div className="mt-0.5 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
-                      {getNotificationIcon(notification.type)}
+                    <div className="relative mt-0.5 h-11 w-11 flex-shrink-0">
+                      <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04] text-sm text-gray-300">
+                        {notification.actor?.avatarUrl ? (
+                          <img
+                            src={notification.actor.avatarUrl}
+                            alt={notification.actor?.displayName || notification.actor?.username || "profile"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span>{getActorInitial(notification)}</span>
+                        )}
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-white text-black">
+                        {getNotificationIcon(notification.type)}
+                      </span>
                     </div>
 
                     <div className="min-w-0 flex-1">

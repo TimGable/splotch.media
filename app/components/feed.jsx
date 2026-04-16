@@ -571,7 +571,7 @@ export function Feed({
                   <div
                     className={
                       item.mediaKind === "video"
-                        ? "mx-auto w-full max-w-[42rem]"
+                        ? "mx-auto w-full max-w-[22rem] sm:max-w-[32rem] md:max-w-[42rem]"
                         : "mx-auto w-full max-w-[16rem] sm:max-w-[18rem]"
                     }
                   >
@@ -581,11 +581,12 @@ export function Feed({
                           src={item.asset.url}
                           poster={item.coverAsset?.url || ""}
                           className="w-full border border-white/10"
+                          ratioClass="aspect-[4/5] sm:aspect-video"
                           muted
                           allowFullscreen
                         />
                       ) : (
-                        <div className="aspect-video w-full border border-white/10 bg-white/5" />
+                        <div className="aspect-[4/5] w-full border border-white/10 bg-white/5 sm:aspect-video" />
                       )
                     ) : (
                       <motion.button
