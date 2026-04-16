@@ -229,7 +229,6 @@ export function VideoPlayer({
   };
 
   const shouldShowControls =
-    isCoarsePointer ||
     !isPlaying ||
     !isReady ||
     (!isFullscreen && isHovering) ||
@@ -261,108 +260,113 @@ export function VideoPlayer({
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
-          controls={false}
+          controls={isCoarsePointer}
+          controlsList="nodownload"
         >
           {src ? <source src={src} /> : null}
         </video>
 
-        <button
-          type="button"
-          onClick={togglePlay}
-          className={`pointer-events-auto absolute inset-0 flex cursor-pointer items-center justify-center transition-opacity ${
-            shouldShowCenterButton ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-          aria-label={isPlaying ? "Pause video" : "Play video"}
-        >
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-md md:h-16 md:w-16">
-            {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}
-          </span>
-        </button>
+        {!isCoarsePointer ? (
+          <button
+            type="button"
+            onClick={togglePlay}
+            className={`pointer-events-auto absolute inset-0 flex cursor-pointer items-center justify-center transition-opacity ${
+              shouldShowCenterButton ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+            aria-label={isPlaying ? "Pause video" : "Play video"}
+          >
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-md md:h-16 md:w-16">
+              {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}
+            </span>
+          </button>
+        ) : null}
 
-        <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 transition-opacity md:p-4 ${
-            shouldShowControls ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          <div className="pointer-events-auto space-y-3 text-xs text-white">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={togglePlay}
-                className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:border-white/60 md:h-8 md:w-8"
-                aria-label={isPlaying ? "Pause video" : "Play video"}
-              >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
-              </button>
-              <div className="flex-1">
-                <div className="relative h-1.5 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-white to-white/70"
-                    style={{ width: `${progress * 100}%` }}
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.001"
-                    value={progress}
-                    aria-label="Seek"
-                    onChange={handleSeek}
-                    className="absolute inset-x-0 -top-3 h-8 w-full cursor-pointer appearance-none opacity-0"
-                  />
-                </div>
-                <div className="mt-1 flex justify-between text-[10px] uppercase tracking-[0.18em] text-white/80">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3">
-              <div
-                className="flex flex-row-reverse items-center gap-2"
-                onMouseEnter={() => setIsVolumeHovering(true)}
-                onMouseLeave={() => setIsVolumeHovering(false)}
-              >
+        {!isCoarsePointer ? (
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 transition-opacity md:p-4 ${
+              shouldShowControls ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <div className="pointer-events-auto space-y-3 text-xs text-white">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={toggleMute}
-                  className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:border-white/60 md:h-8 md:w-8"
-                  aria-label={isMuted ? "Unmute" : "Mute"}
+                  onClick={togglePlay}
+                  className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:border-white/60"
+                  aria-label={isPlaying ? "Pause video" : "Play video"}
                 >
-                  {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
                 </button>
+                <div className="flex-1">
+                  <div className="relative h-1.5 overflow-hidden rounded-full bg-white/20">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-white to-white/70"
+                      style={{ width: `${progress * 100}%` }}
+                    />
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.001"
+                      value={progress}
+                      aria-label="Seek"
+                      onChange={handleSeek}
+                      className="absolute inset-0 h-1.5 w-full cursor-pointer appearance-none opacity-0"
+                    />
+                  </div>
+                  <div className="mt-1 flex justify-between text-[10px] uppercase tracking-[0.18em] text-white/80">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
                 <div
-                  className={`hidden items-center overflow-hidden rounded-full border border-white/30 bg-black/70 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white transition-all duration-200 md:flex ${
-                    isVolumeHovering && !isCoarsePointer ? "max-w-[9rem] opacity-100" : "max-w-0 opacity-0 pointer-events-none"
-                  }`}
+                  className="flex flex-row-reverse items-center gap-2"
+                  onMouseEnter={() => setIsVolumeHovering(true)}
+                  onMouseLeave={() => setIsVolumeHovering(false)}
                 >
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={isMuted ? 0 : volume}
-                    onChange={handleVolumeChange}
-                    className="h-1 w-24 cursor-pointer accent-white"
-                    aria-label="Volume"
-                  />
+                  <button
+                    type="button"
+                    onClick={toggleMute}
+                    className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:border-white/60"
+                    aria-label={isMuted ? "Unmute" : "Mute"}
+                  >
+                    {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </button>
+                  <div
+                    className={`flex items-center overflow-hidden rounded-full border border-white/30 bg-black/70 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white transition-all duration-200 ${
+                      isVolumeHovering ? "max-w-[9rem] opacity-100" : "max-w-0 opacity-0 pointer-events-none"
+                    }`}
+                  >
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={isMuted ? 0 : volume}
+                      onChange={handleVolumeChange}
+                      className="h-1 w-24 cursor-pointer accent-white"
+                      aria-label="Volume"
+                    />
+                  </div>
                 </div>
+                {allowFullscreen ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleFullscreen}
+                    className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:border-white/60"
+                    aria-label="Toggle fullscreen"
+                    aria-pressed={isFullscreen}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
-              {allowFullscreen ? (
-                <button
-                  type="button"
-                  onClick={handleToggleFullscreen}
-                  className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/10 text-white hover:border-white/60 md:h-8 md:w-8"
-                  aria-label="Toggle fullscreen"
-                  aria-pressed={isFullscreen}
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </button>
-              ) : null}
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

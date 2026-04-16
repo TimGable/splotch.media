@@ -114,6 +114,7 @@ export async function GET(request: Request) {
         mediaKind: string;
         ownerUserId: string;
         collectionId?: string | null;
+        collectionTitle?: string | null;
         releaseType?: string | null;
         slug?: string;
       }
@@ -229,8 +230,18 @@ export async function GET(request: Request) {
         }
 
         for (const [mediaItemId, mediaItem] of mediaItemsById.entries()) {
+          const collectionTitle = mediaItem.collectionId
+            ? collectionTitleById.get(mediaItem.collectionId) || null
+            : null;
           mediaItemsById.set(mediaItemId, {
             ...mediaItem,
+            title:
+              mediaItem.mediaKind === "music" &&
+              mediaItem.collectionId &&
+              mediaItem.releaseType !== "single"
+                ? collectionTitle || mediaItem.title
+                : mediaItem.title,
+            collectionTitle,
             slug: mediaSlugMap.get(mediaItemId) || "",
           });
         }

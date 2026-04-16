@@ -5,6 +5,14 @@ import { GlobalAudioPlayer } from "./global-audio-player";
 
 const PublicAudioContext = createContext(null);
 
+function isMultiTrackReleaseItem(item) {
+  return item?.mediaKind === "music" && item?.collectionId && item?.releaseType !== "single";
+}
+
+function getReleaseTitle(item) {
+  return isMultiTrackReleaseItem(item) ? item.collectionTitle || item.title : item.title;
+}
+
 function createQueueEntry(item, profile) {
   return {
     track: {
@@ -14,8 +22,8 @@ function createQueueEntry(item, profile) {
       slug: item.slug || "",
     },
     release: {
-      id: item.id,
-      title: item.title,
+      id: item.collectionId || item.id,
+      title: getReleaseTitle(item),
       coverArt: item.coverAsset?.url || "",
     },
     artist: {

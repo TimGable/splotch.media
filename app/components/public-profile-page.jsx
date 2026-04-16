@@ -17,6 +17,14 @@ import { CONTENT_SWAP_ANIMATION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, PAGE_TRANSI
 
 const PROFILE_BACK_NAV_DELAY_MS = 260;
 
+function isMultiTrackReleaseItem(item) {
+  return item?.mediaKind === "music" && item?.collectionId && item?.releaseType !== "single";
+}
+
+function getReleaseTitle(item) {
+  return isMultiTrackReleaseItem(item) ? item.collectionTitle || item.title : item.title;
+}
+
 function createProfileQueueEntry(item, artist) {
   return {
     track: {
@@ -26,8 +34,8 @@ function createProfileQueueEntry(item, artist) {
       slug: item.slug || "",
     },
     release: {
-      id: item.id,
-      title: item.title,
+      id: item.collectionId || item.id,
+      title: getReleaseTitle(item),
       coverArt: item.coverAsset?.url || "",
     },
     artist: {

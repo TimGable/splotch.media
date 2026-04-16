@@ -9,6 +9,14 @@ function normalizeQuery(value: string) {
   return String(value || "").trim();
 }
 
+function isMultiTrackRelease(item: {
+  media_kind?: string | null;
+  collection_id?: string | null;
+  music_release_type?: string | null;
+}) {
+  return item.media_kind === "music" && item.collection_id && item.music_release_type !== "single";
+}
+
 async function createSignedUrl(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
   bucket: string,
@@ -230,11 +238,15 @@ export async function GET(request: Request) {
           return null;
         }
 
+        const collectionTitle = item.collection_id ? collectionTitleById.get(item.collection_id) || null : null;
+
         return {
           id: item.id,
-          title: item.title,
+          title: isMultiTrackRelease(item) ? collectionTitle || item.title : item.title,
           description: item.description,
           mediaKind: item.media_kind,
+          collectionTitle,
+          releaseType: item.music_release_type,
           createdAt: item.created_at,
           artist: owner,
           previewUrl: primaryAssetsByItemId.get(item.id)?.url ?? null,

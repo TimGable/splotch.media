@@ -8,6 +8,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { buildPublicMediaPath, buildPublicProfilePath } from "@/lib/media-slugs";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
 import { MentionText } from "./mention-text";
+import { ViewportPortal } from "./viewport-portal";
 
 function getNotificationIcon(type) {
   if (type === "follow") {
@@ -55,6 +56,7 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const rootRef = useRef(null);
   const panelRef = useRef(null);
 
   const loadNotifications = async ({ markAsRead = false } = {}) => {
@@ -145,14 +147,17 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
     }
 
     const handlePointerDown = (event) => {
-      if (!panelRef.current?.contains(event.target)) {
+      const clickedPanel = panelRef.current?.contains(event.target);
+      const clickedTrigger = rootRef.current?.contains(event.target);
+
+      if (!clickedPanel && !clickedTrigger) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [isOpen]);
 
@@ -175,8 +180,87 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
     }
   };
 
+  const panel = (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          ref={panelRef}
+          className={`pointer-events-auto z-[9999] overflow-hidden rounded-[1.65rem] border border-white/10 bg-black p-3 shadow-[0_24px_80px_rgba(0,0,0,0.65)] ${
+            compact
+              ? "fixed left-3 right-3 top-[5rem] max-h-[calc(100dvh-6rem)] w-auto"
+              : "absolute right-0 top-[calc(100%+0.75rem)] w-[min(24rem,calc(100vw-2rem))]"
+          }`}
+          {...SOFT_PANEL_REVEAL}
+          transition={PAGE_TRANSITION}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
+        >
+          <div className="px-3 pb-2 pt-1">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">
+              notifications
+            </p>
+          </div>
+
+          {isLoading ? (
+            <div className="px-3 py-6 text-sm text-gray-400">loading notifications...</div>
+          ) : notifications.length > 0 ? (
+            <div
+              className={`scrollbar-hidden overflow-y-auto ${
+                compact ? "max-h-[calc(100dvh-11rem)]" : "max-h-[24rem]"
+              }`}
+            >
+              {notifications.map((notification) => (
+                <motion.button
+                  key={notification.id}
+                  type="button"
+                  onClick={() => handleOpenTarget(notification)}
+                  className="flex w-full cursor-pointer items-start gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-colors hover:border-white/10 hover:bg-white/[0.04]"
+                  whileHover={SOFT_BUTTON_HOVER}
+                  whileTap={SOFT_BUTTON_TAP}
+                >
+                  <div className="relative mt-0.5 h-11 w-11 flex-shrink-0">
+                    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04] text-sm text-gray-300">
+                      {notification.actor?.avatarUrl ? (
+                        <img
+                          src={notification.actor.avatarUrl}
+                          alt={notification.actor?.displayName || notification.actor?.username || "profile"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span>{getActorInitial(notification)}</span>
+                      )}
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-white text-black">
+                      {getNotificationIcon(notification.type)}
+                    </span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-white">{getNotificationText(notification)}</p>
+                    {(notification.type === "comment" || notification.type === "mention") && notification.data?.bodyPreview ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                        <MentionText text={notification.data.bodyPreview} />
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-gray-500">
+                      {notification.createdAtLabel}
+                    </p>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-6 text-sm text-gray-400">no notifications yet.</div>
+          )}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative" ref={rootRef}>
       <motion.button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -195,81 +279,7 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
         ) : null}
       </motion.button>
 
-      <AnimatePresence>
-        {isOpen ? (
-          <motion.div
-            className={`pointer-events-auto absolute z-[9999] overflow-hidden rounded-[1.65rem] border border-white/10 bg-black p-3 shadow-[0_24px_80px_rgba(0,0,0,0.65)] ${
-              compact
-                ? "fixed left-3 right-3 top-[5rem] max-h-[calc(100dvh-6rem)] w-auto"
-                : "right-0 top-[calc(100%+0.75rem)] w-[min(24rem,calc(100vw-2rem))]"
-            }`}
-            {...SOFT_PANEL_REVEAL}
-            transition={PAGE_TRANSITION}
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-            onWheel={(event) => event.stopPropagation()}
-          >
-            <div className="px-3 pb-2 pt-1">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">
-                notifications
-              </p>
-            </div>
-
-            {isLoading ? (
-              <div className="px-3 py-6 text-sm text-gray-400">loading notifications...</div>
-            ) : notifications.length > 0 ? (
-              <div
-                className={`scrollbar-hidden overflow-y-auto ${
-                  compact ? "max-h-[calc(100dvh-11rem)]" : "max-h-[24rem]"
-                }`}
-              >
-                {notifications.map((notification) => (
-                  <motion.button
-                    key={notification.id}
-                    type="button"
-                    onClick={() => handleOpenTarget(notification)}
-                    className="flex w-full cursor-pointer items-start gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-colors hover:border-white/10 hover:bg-white/[0.04]"
-                    whileHover={SOFT_BUTTON_HOVER}
-                    whileTap={SOFT_BUTTON_TAP}
-                  >
-                    <div className="relative mt-0.5 h-11 w-11 flex-shrink-0">
-                      <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04] text-sm text-gray-300">
-                        {notification.actor?.avatarUrl ? (
-                          <img
-                            src={notification.actor.avatarUrl}
-                            alt={notification.actor?.displayName || notification.actor?.username || "profile"}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span>{getActorInitial(notification)}</span>
-                        )}
-                      </div>
-                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-white text-black">
-                        {getNotificationIcon(notification.type)}
-                      </span>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-white">{getNotificationText(notification)}</p>
-                      {(notification.type === "comment" || notification.type === "mention") && notification.data?.bodyPreview ? (
-                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                          <MentionText text={notification.data.bodyPreview} />
-                        </p>
-                      ) : null}
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-gray-500">
-                        {notification.createdAtLabel}
-                      </p>
-                    </div>
-                  </motion.button>
-                ))}
-              </div>
-            ) : (
-              <div className="px-3 py-6 text-sm text-gray-400">no notifications yet.</div>
-            )}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {compact ? <ViewportPortal>{panel}</ViewportPortal> : panel}
     </div>
   );
 }

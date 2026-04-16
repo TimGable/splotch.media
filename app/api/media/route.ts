@@ -156,6 +156,7 @@ async function buildMediaItemResponse(
 
   let primaryAsset = null;
   let coverAsset = null;
+  let collectionTitle: string | null = null;
 
   for (const asset of assets ?? []) {
     const signedAsset = await createSignedAssetPayload(supabase, asset);
@@ -167,10 +168,21 @@ async function buildMediaItemResponse(
     }
   }
 
+  if (item.collection_id) {
+    const { data: collection } = await supabase
+      .from("media_collections")
+      .select("title")
+      .eq("id", item.collection_id)
+      .maybeSingle();
+
+    collectionTitle = collection?.title || null;
+  }
+
   return {
     id: item.id,
     mediaKind: item.media_kind,
     collectionId: item.collection_id ?? null,
+    collectionTitle,
     releaseType: item.music_release_type,
     title: item.title,
     description: item.description,

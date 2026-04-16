@@ -571,21 +571,50 @@ export function Feed({
                   <div
                     className={
                       item.mediaKind === "video"
-                        ? "mx-auto w-full max-w-[22rem] sm:max-w-[32rem] md:max-w-[42rem]"
+                        ? "mx-auto w-full max-w-[22rem] md:max-w-[42rem]"
                         : "mx-auto w-full max-w-[16rem] sm:max-w-[18rem]"
                     }
                   >
                     {item.mediaKind === "video" ? (
                       item.asset?.url ? (
-                        <VideoPlayer
-                          src={item.asset.url}
-                          poster={item.coverAsset?.url || ""}
-                          className="w-full border border-white/10"
-                          ratioClass="aspect-[4/5] sm:aspect-video"
-                          useIntrinsicAspect={false}
-                          muted
-                          allowFullscreen
-                        />
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onOpenItem?.(item)}
+                            className="group block w-full overflow-hidden border border-white/10 bg-black text-left md:hidden"
+                            aria-label={`Open ${item.title}`}
+                          >
+                            <div className="relative aspect-[4/5] w-full">
+                              {item.coverAsset?.url ? (
+                                <img
+                                  src={item.coverAsset.url}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-white/[0.03]">
+                                  <VideoIcon className="h-12 w-12 text-white/30" />
+                                </div>
+                              )}
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/10">
+                                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/40 bg-black/65 text-white backdrop-blur-sm">
+                                  <VideoIcon className="h-6 w-6" />
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+
+                          <div className="hidden md:block">
+                            <VideoPlayer
+                              src={item.asset.url}
+                              poster={item.coverAsset?.url || ""}
+                              className="w-full border border-white/10"
+                              ratioClass="aspect-video"
+                              muted
+                              allowFullscreen
+                            />
+                          </div>
+                        </>
                       ) : (
                         <div className="aspect-[4/5] w-full border border-white/10 bg-white/5 sm:aspect-video" />
                       )

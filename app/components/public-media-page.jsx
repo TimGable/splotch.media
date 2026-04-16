@@ -81,6 +81,14 @@ function sortReleaseTracks(a, b) {
   return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
 }
 
+function isMultiTrackReleaseItem(item) {
+  return item?.mediaKind === "music" && item?.collectionId && item?.releaseType !== "single";
+}
+
+function getMediaDisplayTitle(item) {
+  return isMultiTrackReleaseItem(item) ? item.collectionTitle || item.title : item.title;
+}
+
 export function PublicMediaPage({ profile, item, publicItems }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -112,6 +120,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
   const relatedItems = displayedPublicItems.filter((entry) => entry.id !== displayedItem.id).slice(0, 4);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const isMusic = displayedItem.mediaKind === "music";
+  const displayTitle = getMediaDisplayTitle(displayedItem);
   const collectionTracks = useMemo(() => {
     if (
       displayedItem.mediaKind !== "music" ||
@@ -426,7 +435,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                   ? "visual piece"
                   : "video release"}
             </p>
-            <h1 className="max-w-4xl text-3xl leading-tight md:text-5xl">{displayedItem.title}</h1>
+            <h1 className="max-w-4xl text-3xl leading-tight md:text-5xl">{displayTitle}</h1>
             <Link
               href={buildPublicProfilePath(profile.username)}
               className="mt-4 inline-block text-sm text-gray-400 transition-colors hover:text-white"
@@ -465,7 +474,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                 {displayedItem.coverAsset?.url ? (
                   <img
                     src={displayedItem.coverAsset.url}
-                    alt={displayedItem.title}
+                    alt={displayTitle}
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -528,7 +537,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                         currentTime={displayedCurrentTime}
                         duration={displayedDuration}
                         onSeek={handleSeek}
-                        seekLabel={`Seek ${displayedItem.title}`}
+                        seekLabel={`Seek ${displayTitle}`}
                       />
                       </div>
 
@@ -544,7 +553,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                     <div className="mt-6 border-t border-white/10 pt-4">
                       <div className="mb-3 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-gray-500">
                         <span>{collectionTracks.length} tracks</span>
-                        <span>{displayedItem.collectionTitle || displayedItem.title}</span>
+                        <span>{displayTitle}</span>
                       </div>
 
                       <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1 archive-scrollbar-thin">
@@ -633,7 +642,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                   {displayedItem.asset?.url ? (
                     <img
                       src={displayedItem.asset.url}
-                      alt={displayedItem.title}
+                      alt={displayTitle}
                       className="max-h-[34rem] w-full object-contain"
                     />
                   ) : (

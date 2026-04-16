@@ -54,6 +54,14 @@ function kindLabel(mediaKind) {
   return "video release";
 }
 
+function isMultiTrackReleaseItem(item) {
+  return item?.mediaKind === "music" && item?.collectionId && item?.releaseType !== "single";
+}
+
+function getMediaDisplayTitle(item) {
+  return isMultiTrackReleaseItem(item) ? item.collectionTitle || item.title : item.title;
+}
+
 export function MediaItemPage({
   item,
   isPlaying,
@@ -74,6 +82,7 @@ export function MediaItemPage({
 }) {
   const waveformData = buildWaveformData(`${item.id}:${item.asset?.fileName || item.title}`);
   const progress = duration > 0 ? currentTime / duration : 0;
+  const displayTitle = getMediaDisplayTitle(item);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const resolvedGalleryItems = useMemo(
     () =>
@@ -116,7 +125,7 @@ export function MediaItemPage({
             <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-gray-500">
               {kindLabel(item.mediaKind)}
             </p>
-            <h3 className="max-w-4xl text-3xl leading-tight md:text-5xl">{item.title}</h3>
+            <h3 className="max-w-4xl text-3xl leading-tight md:text-5xl">{displayTitle}</h3>
             {item.description && (
               <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-400 md:text-base">
                 <MentionText text={item.description} />
@@ -142,7 +151,7 @@ export function MediaItemPage({
                   {item.coverAsset?.url ? (
                     <img
                       src={item.coverAsset.url}
-                      alt={item.title}
+                      alt={displayTitle}
                       className="h-full w-full object-cover"
                       style={{
                         WebkitMaskImage:
@@ -211,7 +220,7 @@ export function MediaItemPage({
                             currentTime={isActive ? currentTime : 0}
                             duration={isActive ? duration : 0}
                             onSeek={isActive ? onSeek : undefined}
-                            seekLabel={`Seek ${item.title}`}
+                            seekLabel={`Seek ${displayTitle}`}
                             disabled={!isActive}
                           />
                         </div>
@@ -237,7 +246,7 @@ export function MediaItemPage({
                   {item.asset?.url ? (
                     <img
                       src={item.asset.url}
-                      alt={item.title}
+                      alt={displayTitle}
                       className="max-h-[34rem] w-full object-contain"
                     />
                   ) : (
