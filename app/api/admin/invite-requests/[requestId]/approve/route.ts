@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCreatePasswordUrl } from "@/lib/app-url";
 import {
   createSupabaseServerClient,
   createSupabaseServiceRoleClient,
@@ -153,11 +154,6 @@ async function ensureAppUser(authUserId: string, email: string) {
   };
 }
 
-function getInviteRedirectUrl() {
-  const base = process.env.APP_BASE_URL || "http://localhost:3000";
-  return `${base.replace(/\/+$/, "")}/create-password`;
-}
-
 function isAlreadyRegisteredAuthError(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes("already been registered") || normalized.includes("already registered");
@@ -208,7 +204,7 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
-    const redirectTo = getInviteRedirectUrl();
+    const redirectTo = getCreatePasswordUrl();
     let linkType: "invite" | "recovery" = "invite";
     let sentViaResendFallback = false;
     let generatedActionLink: string | null = null;

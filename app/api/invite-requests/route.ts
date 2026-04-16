@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAppBaseUrl } from "@/lib/app-url";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { sendInviteRequestNotification } from "@/lib/notifications/email";
 import { createInviteEmailActionToken } from "@/lib/invite-request-email-actions";
@@ -10,11 +11,6 @@ type InviteRequestPayload = {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function getAppBaseUrl() {
-  const base = process.env.APP_BASE_URL || "http://localhost:3000";
-  return base.replace(/\/+$/, "");
 }
 
 export async function POST(request: Request) {

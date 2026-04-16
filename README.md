@@ -66,11 +66,13 @@ Required variables:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server only; never expose in client code)
-- `APP_BASE_URL` (used in approval emails to build `/create-password` redirect)
+- `APP_BASE_URL` (your canonical deployed URL, `https://splotchmedia.com`; used in emails and `/create-password` redirects)
 - `INVITE_EMAIL_ACTION_SECRET` (optional; secret for one-click owner email approve/deny buttons)
 - `RESEND_API_KEY` (optional; enables admin email notifications)
 - `FROM_EMAIL` (optional; sender identity for app emails)
 - `NOTIFY_OWNER_EMAIL` (optional; receives invite request notifications)
+
+On Vercel, set `APP_BASE_URL=https://splotchmedia.com` in Project Settings -> Environment Variables for Production. If it is omitted, the app falls back to Vercel's deployment URL environment variables, then to `http://localhost:3000` for local development.
 
 2. In Supabase SQL Editor, run schema:
 

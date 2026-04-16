@@ -1,9 +1,8 @@
 "use server";
 
 import { NextResponse } from "next/server";
+import { getCreatePasswordUrl } from "@/lib/app-url";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-
-const DEFAULT_APP_BASE_URL = "http://localhost:3000";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -23,8 +22,7 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createSupabaseServiceRoleClient();
-    const baseUrl = (process.env.APP_BASE_URL || DEFAULT_APP_BASE_URL).replace(/\/$/, "");
-    const redirectTo = `${baseUrl}/create-password`;
+    const redirectTo = getCreatePasswordUrl();
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
