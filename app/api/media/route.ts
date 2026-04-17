@@ -17,6 +17,7 @@ const MAX_STANDARD_FILE_SIZE_BYTES = 250 * 1024 * 1024;
 const MAX_VIDEO_FILE_SIZE_BYTES = 1024 * 1024 * 1024;
 const MAX_COVER_ART_SIZE_BYTES = 10 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const IMAGE_PREVIEW_WIDTH = 900;
 const IMAGE_MIME_PREFIX = "image/";
 const BLOCKED_IMAGE_MIME_TYPES = new Set(["image/svg+xml"]);
 
@@ -107,11 +108,15 @@ async function createSignedAssetPayload(
     mime_type: string;
     file_size_bytes: number;
   },
+  options: { previewWidth?: number } = {},
 ) {
   let assetUrl: string | null = null;
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from(asset.bucket)
-    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS);
+  const signedUrlOptions =
+    options.previewWidth && asset.mime_type?.startsWith("image/")
+      ? { transform: { width: options.previewWidth, resize: "contain" as const } }
+      : undefined;
+  const { data: signedData, error: signedError } = await (supabase.storage.from(asset.bucket) as any)
+    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS, signedUrlOptions);
 
   if (!signedError) {
     assetUrl = signedData?.signedUrl ?? null;
@@ -498,6 +503,7 @@ export async function GET(request: Request) {
     const socialSummaryByItemId = await getMediaSocialSummary(supabase, itemIds, userId);
 
     const primaryAssetsById = new Map<string, Record<string, unknown>>();
+    const previewAssetsById = new Map<string, Record<string, unknown>>();
     const coverAssetsByItemId = new Map<string, Record<string, unknown>>();
     const collectionTitleById = new Map<string, string>();
     const trackNumberByItemId = new Map<string, number | null>();
@@ -518,10 +524,19 @@ export async function GET(request: Request) {
 
         if (asset.role === "original") {
           primaryAssetsById.set(asset.id, signedAsset);
+          if (asset.mime_type?.startsWith("image/")) {
+            previewAssetsById.set(
+              asset.id,
+              await createSignedAssetPayload(supabase, asset, { previewWidth: IMAGE_PREVIEW_WIDTH }),
+            );
+          }
         }
 
         if (asset.role === "thumbnail" && asset.media_item_id) {
-          coverAssetsByItemId.set(asset.media_item_id, signedAsset);
+          coverAssetsByItemId.set(
+            asset.media_item_id,
+            await createSignedAssetPayload(supabase, asset, { previewWidth: IMAGE_PREVIEW_WIDTH }),
+          );
         }
       }
 
@@ -571,6 +586,7 @@ export async function GET(request: Request) {
         durationMs: item.duration_ms,
         trackNumber: trackNumberByItemId.get(item.id) ?? null,
         asset: item.primary_asset_id ? primaryAssetsById.get(item.primary_asset_id) ?? null : null,
+        previewAsset: item.primary_asset_id ? previewAssetsById.get(item.primary_asset_id) ?? null : null,
         coverAsset: coverAssetsByItemId.get(item.id) ?? null,
         likes: socialSummaryByItemId.get(item.id)?.likes || 0,
         comments: socialSummaryByItemId.get(item.id)?.comments || 0,

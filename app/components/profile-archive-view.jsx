@@ -6,6 +6,7 @@ import { MusicReleasePlayer } from "./music-release-player";
 import { MultiTrackReleaseCard } from "./multi-track-release-card";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
+import { FadeInImage } from "./fade-in-image";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_CARD_HOVER } from "@/lib/motion";
 
 function groupItems(items) {
@@ -200,17 +201,18 @@ export function ProfileArchiveView({
 
   return (
     <div>
-      <div className="mb-10 border border-white/20 p-6 md:p-10">
-        <div className="flex flex-col gap-8 md:flex-row md:items-start">
-          <div className="h-32 w-32 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/20 bg-gradient-to-br from-gray-800 to-gray-900 md:h-48 md:w-48">
+      <div className="mb-8 border border-white/20 p-4 md:mb-10 md:p-10">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-8">
+          <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/20 bg-gradient-to-br from-gray-800 to-gray-900 md:h-48 md:w-48">
             {profile.avatarUrl ? (
-              <img
+              <FadeInImage
                 src={profile.avatarUrl}
                 alt={profile.displayName}
                 className="h-full w-full object-cover"
+                containerClassName="h-full w-full"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-6xl text-gray-600 md:text-8xl">
+              <div className="flex h-full w-full items-center justify-center text-4xl text-gray-600 md:text-8xl">
                 {avatarFallback}
               </div>
             )}
@@ -223,13 +225,13 @@ export function ProfileArchiveView({
             <p className="mb-3 cursor-default select-none text-[11px] uppercase tracking-[0.22em] text-gray-500">
               {headerLabel}
             </p>
-            <h1 className="cursor-default select-none text-3xl md:text-5xl">{profile.displayName}</h1>
-            <p className="mt-2 cursor-default select-none text-gray-400">@{profile.username}</p>
+            <h1 className="cursor-default select-none text-2xl md:text-5xl">{profile.displayName}</h1>
+            <p className="mt-1.5 cursor-default select-none text-sm text-gray-400 md:mt-2 md:text-base">@{profile.username}</p>
             {profile.email ? (
               <p className="mt-3 cursor-default select-none text-gray-500">{profile.email}</p>
             ) : null}
 
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-400">
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-400 md:gap-3 md:text-sm">
               <CountButton
                 value={profile.followerCount || 0}
                 label="followers"
@@ -246,13 +248,13 @@ export function ProfileArchiveView({
             </div>
 
             {profile.categoryTags?.length > 0 ? (
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2 md:mt-5">
                 {profile.categoryTags.map((tag) => {
                   const Icon = categoryMeta[tag]?.icon;
                   return (
                     <span
                       key={tag}
-                      className="inline-flex cursor-default select-none items-center gap-2 border border-white/20 bg-white/5 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-gray-300"
+                      className="inline-flex cursor-default select-none items-center gap-1.5 border border-white/20 bg-white/5 px-2.5 py-1.5 text-[11px] uppercase tracking-[0.16em] text-gray-300 md:gap-2 md:px-3 md:text-xs md:tracking-[0.18em]"
                     >
                       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                       <span>{categoryMeta[tag]?.label || tag}</span>
@@ -263,18 +265,18 @@ export function ProfileArchiveView({
             ) : null}
 
             {profile.bio ? (
-              <p className="mt-6 max-w-3xl cursor-default select-none text-sm leading-relaxed text-gray-300 md:text-base">
+              <p className="mt-4 max-w-3xl cursor-default select-none text-sm leading-relaxed text-gray-300 md:mt-6 md:text-base">
                 <MentionText text={profile.bio} />
               </p>
             ) : null}
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+            <div className="mt-5 flex flex-wrap items-center gap-2 md:mt-6 md:gap-3">
               {canFollow && onFollowToggle ? (
                 <motion.button
                   type="button"
                   onClick={onFollowToggle}
                   disabled={isUpdatingFollow}
-                  className={`border px-5 py-3 text-sm tracking-wide transition-colors ${
+                  className={`border px-4 py-2.5 text-sm tracking-wide transition-colors md:px-5 md:py-3 ${
                     isFollowing
                       ? "border-white/40 bg-white text-black hover:bg-white/90"
                       : "border-white/40 bg-transparent text-white hover:border-white/60 hover:bg-white/5"
@@ -290,7 +292,7 @@ export function ProfileArchiveView({
             </div>
 
             {headerBottomRight ? (
-              <div className="mt-6 flex justify-end">{headerBottomRight}</div>
+              <div className="mt-5 flex justify-start md:mt-6 md:justify-end">{headerBottomRight}</div>
             ) : null}
           </div>
         </div>
@@ -316,16 +318,16 @@ export function ProfileArchiveView({
 
       <div>
         {contentHeading ? (
-          <h2 className="mb-8 cursor-default select-none text-2xl md:text-3xl">{contentHeading}</h2>
+          <h2 className="mb-6 cursor-default select-none text-xl md:mb-8 md:text-3xl">{contentHeading}</h2>
         ) : null}
         {profile.categoryTags?.length > 0 ? (
-          <div className="space-y-12">
+          <div className="space-y-9 md:space-y-12">
             {profile.categoryTags.includes("music") ? (
               <section>
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <Music className="h-6 w-6" />
-                    <h3 className="cursor-default select-none text-xl">music releases</h3>
+                <div className="mb-4 flex items-center justify-between gap-3 md:mb-6 md:gap-4">
+                  <div className="flex items-center gap-2.5 md:gap-3">
+                    <Music className="h-5 w-5 md:h-6 md:w-6" />
+                    <h3 className="cursor-default select-none text-lg md:text-xl">music releases</h3>
                   </div>
 
                   {isOwner && onUpload ? (
@@ -353,7 +355,7 @@ export function ProfileArchiveView({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 gap-4 md:gap-6">
                     {musicDisplayEntries.map((entry) =>
                       entry.kind === "release" ? (
                         <MultiTrackReleaseCard
@@ -399,10 +401,10 @@ export function ProfileArchiveView({
 
             {profile.categoryTags.includes("visual") ? (
               <section>
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <Palette className="h-6 w-6" />
-                    <h3 className="cursor-default select-none text-xl">visual art</h3>
+                <div className="mb-4 flex items-center justify-between gap-3 md:mb-6 md:gap-4">
+                  <div className="flex items-center gap-2.5 md:gap-3">
+                    <Palette className="h-5 w-5 md:h-6 md:w-6" />
+                    <h3 className="cursor-default select-none text-lg md:text-xl">visual art</h3>
                   </div>
 
                   {isOwner && onUpload ? (
@@ -430,20 +432,20 @@ export function ProfileArchiveView({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
                     {groupedItems.visual.map((item) => (
                       <motion.div
                         key={item.id}
-                        className="border border-white/20 bg-white/5 p-5 transition-colors hover:border-white/40 hover:bg-white/[0.08]"
+                        className="border border-white/20 bg-white/5 p-3.5 transition-colors hover:border-white/40 hover:bg-white/[0.08] md:p-5"
                         whileHover={SOFT_CARD_HOVER}
                         transition={PAGE_TRANSITION}
                       >
-                        <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="mb-3 flex items-start justify-between gap-3 md:mb-4">
                           <div className="min-w-0">
                             <motion.button
                               type="button"
                               onClick={() => onOpenItem(item)}
-                              className="cursor-pointer text-left text-lg transition-colors hover:text-gray-300"
+                              className="cursor-pointer text-left text-base transition-colors hover:text-gray-300 md:text-lg"
                               whileHover={SOFT_BUTTON_HOVER}
                               whileTap={SOFT_BUTTON_TAP}
                             >
@@ -471,18 +473,18 @@ export function ProfileArchiveView({
                         <motion.button
                           type="button"
                           onClick={() => (onOpenVisual ? onOpenVisual(item) : onOpenItem(item))}
-                          className="mb-4 block w-full cursor-pointer overflow-hidden border border-white/10 bg-black text-left transition-colors hover:border-white/30"
+                          className="mb-3 block w-full cursor-pointer overflow-hidden border border-white/10 bg-black text-left transition-colors hover:border-white/30 md:mb-4"
                           whileHover={SOFT_CARD_HOVER}
                           whileTap={SOFT_BUTTON_TAP}
                         >
-                          {item.asset?.url ? (
-                            <img
-                              src={item.asset.url}
+                          {item.previewAsset?.url || item.asset?.url ? (
+                            <FadeInImage
+                              src={item.previewAsset?.url || item.asset.url}
                               alt={item.title}
-                              className="aspect-square w-full object-cover"
+                              className="aspect-[4/3] w-full object-cover"
                             />
                           ) : (
-                            <div className="aspect-square w-full bg-white/5" />
+                            <div className="aspect-[4/3] w-full bg-white/5" />
                           )}
                         </motion.button>
 
@@ -507,10 +509,10 @@ export function ProfileArchiveView({
 
             {profile.categoryTags.includes("video") ? (
               <section>
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <Video className="h-6 w-6" />
-                    <h3 className="cursor-default select-none text-xl">video content</h3>
+                <div className="mb-4 flex items-center justify-between gap-3 md:mb-6 md:gap-4">
+                  <div className="flex items-center gap-2.5 md:gap-3">
+                    <Video className="h-5 w-5 md:h-6 md:w-6" />
+                    <h3 className="cursor-default select-none text-lg md:text-xl">video content</h3>
                   </div>
 
                   {isOwner && onUpload ? (
@@ -538,20 +540,20 @@ export function ProfileArchiveView({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                     {groupedItems.video.map((item) => (
                       <motion.div
                         key={item.id}
-                        className="border border-white/20 bg-white/5 p-5 transition-colors hover:border-white/40 hover:bg-white/[0.08]"
+                        className="border border-white/20 bg-white/5 p-3.5 transition-colors hover:border-white/40 hover:bg-white/[0.08] md:p-5"
                         whileHover={SOFT_CARD_HOVER}
                         transition={PAGE_TRANSITION}
                       >
-                        <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="mb-3 flex items-start justify-between gap-3 md:mb-4">
                           <div className="min-w-0">
                             <motion.button
                               type="button"
                               onClick={() => onOpenItem(item)}
-                              className="cursor-pointer text-left text-lg transition-colors hover:text-gray-300"
+                              className="cursor-pointer text-left text-base transition-colors hover:text-gray-300 md:text-lg"
                               whileHover={SOFT_BUTTON_HOVER}
                               whileTap={SOFT_BUTTON_TAP}
                             >
@@ -576,13 +578,15 @@ export function ProfileArchiveView({
                           ) : null}
                         </div>
 
-                        <div className="mb-4">
+                        <div className="mb-3 md:mb-4">
                           {item.asset?.url ? (
                             <div className="w-full">
                               <VideoPlayer
                                 src={item.asset.url}
                                 poster={item.coverAsset?.url || ""}
                                 className="w-full border border-white/10"
+                                ratioClass="aspect-video"
+                                useIntrinsicAspect={false}
                                 allowFullscreen
                               />
                             </div>

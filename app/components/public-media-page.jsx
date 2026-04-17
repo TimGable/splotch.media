@@ -12,8 +12,8 @@ import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
 import { EditUploadModal } from "./edit-upload-modal";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
-import { VisualImageFrame } from "./visual-image-frame";
 import { ShareLinkButton } from "./share-link-button";
+import { FadeInImage } from "./fade-in-image";
 import { buildPublicMediaPath, buildPublicProfilePath } from "@/lib/media-slugs";
 import { createSupabaseBrowserClient, getStoredSupabaseUserId } from "@/lib/supabase/client";
 
@@ -91,6 +91,62 @@ function getMediaDisplayTitle(item) {
   return isMultiTrackReleaseItem(item) ? item.collectionTitle || item.title : item.title;
 }
 
+function cleanReleaseDescription(description) {
+  return String(description || "").replace(/^From (EP|Album) ".*?"\.\s*/i, "").trim();
+}
+
+function getRelatedItemIcon(mediaKind, className = "h-5 w-5") {
+  if (mediaKind === "visual") {
+    return <Palette className={className} />;
+  }
+
+  if (mediaKind === "video") {
+    return <Video className={className} />;
+  }
+
+  return <Music2 className={className} />;
+}
+
+function getRelatedItemPreviewUrl(item) {
+  if (item.coverAsset?.url) {
+    return item.coverAsset.url;
+  }
+
+  if (item.mediaKind === "visual" && (item.previewAsset?.url || item.asset?.url)) {
+    return item.previewAsset?.url || item.asset.url;
+  }
+
+  return "";
+}
+
+function buildRelatedItems(items, currentItem) {
+  const currentReleaseCollectionId = isMultiTrackReleaseItem(currentItem)
+    ? currentItem.collectionId
+    : null;
+  const seenReleaseCollectionIds = new Set();
+  const relatedItems = [];
+
+  for (const entry of items) {
+    if (entry.id === currentItem.id) {
+      continue;
+    }
+
+    if (isMultiTrackReleaseItem(entry)) {
+      if (entry.collectionId === currentReleaseCollectionId || seenReleaseCollectionIds.has(entry.collectionId)) {
+        continue;
+      }
+
+      seenReleaseCollectionIds.add(entry.collectionId);
+      relatedItems.push(entry);
+      continue;
+    }
+
+    relatedItems.push(entry);
+  }
+
+  return relatedItems.slice(0, 4);
+}
+
 export function PublicMediaPage({ profile, item, publicItems }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -119,10 +175,14 @@ export function PublicMediaPage({ profile, item, publicItems }) {
   const displayedCurrentTime = isActiveTrack ? currentTime : 0;
   const displayedDuration = isActiveTrack ? duration : 0;
   const progress = displayedDuration > 0 ? displayedCurrentTime / displayedDuration : 0;
-  const relatedItems = displayedPublicItems.filter((entry) => entry.id !== displayedItem.id).slice(0, 4);
+  const relatedItems = useMemo(
+    () => buildRelatedItems(displayedPublicItems, displayedItem),
+    [displayedItem, displayedPublicItems],
+  );
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const isMusic = displayedItem.mediaKind === "music";
   const displayTitle = getMediaDisplayTitle(displayedItem);
+  const displayDescription = cleanReleaseDescription(displayedItem.description);
   const sharePath = buildPublicMediaPath(profile.username, displayedItem.slug);
   const shareUrl =
     typeof window === "undefined" ? sharePath : `${window.location.origin}${sharePath}`;
@@ -421,48 +481,48 @@ export function PublicMediaPage({ profile, item, publicItems }) {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-12">
-      <div className="mb-10 border border-white/20 bg-black/35 p-6 md:p-8">
-        <div className="mb-8 flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-start md:justify-between">
+    <div className="mx-auto max-w-7xl px-3 py-4 md:px-6 md:py-12">
+      <div className="mb-6 border border-white/20 bg-black/35 p-4 md:mb-10 md:p-8">
+        <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 md:mb-8 md:flex-row md:items-start md:justify-between md:gap-4 md:pb-6">
           <div>
             <button
               type="button"
               onClick={handleBack}
-              className="mb-4 inline-block text-sm text-gray-400 transition-colors hover:text-white"
+              className="mb-3 inline-block text-sm text-gray-400 transition-colors hover:text-white md:mb-4"
             >
               <span aria-hidden="true">{"\u2190"}</span>
               <span className="ml-2">back</span>
             </button>
-            <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-gray-500">
+            <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-gray-500 md:mb-3 md:text-[11px] md:tracking-[0.22em]">
               {displayedItem.mediaKind === "music"
                 ? "music release"
                 : displayedItem.mediaKind === "visual"
                   ? "visual piece"
                   : "video release"}
             </p>
-            <h1 className="max-w-4xl text-3xl leading-tight md:text-5xl">{displayTitle}</h1>
+            <h1 className="max-w-4xl text-2xl leading-tight md:text-5xl">{displayTitle}</h1>
             <Link
               href={buildPublicProfilePath(profile.username)}
-              className="mt-4 inline-block text-sm text-gray-400 transition-colors hover:text-white"
+              className="mt-3 inline-block text-sm text-gray-400 transition-colors hover:text-white md:mt-4"
             >
               by {profile.displayName}
             </Link>
-            {displayedItem.description && (
-              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-400 md:text-base">
-                <MentionText text={displayedItem.description} />
+            {displayDescription && (
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-400 md:mt-4 md:text-base">
+                <MentionText text={displayDescription} />
               </p>
             )}
           </div>
 
-          <div className="flex flex-col items-end text-right text-xs uppercase tracking-[0.16em] text-gray-500">
-            <div className="flex flex-col items-end">
+          <div className="flex flex-row flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-gray-500 md:flex-col md:items-end md:text-right">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">
               <p>{displayedItem.visibility.replace("_", " ")}</p>
-              <p className="mt-2">{formatUploadDate(displayedItem.publishedAt || displayedItem.createdAt)}</p>
+              <p className="md:mt-2">{formatUploadDate(displayedItem.publishedAt || displayedItem.createdAt)}</p>
             </div>
             <ShareLinkButton
               url={shareUrl}
               label="share post"
-              className="mt-4 inline-flex items-center gap-2 border border-white/15 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+              className="inline-flex items-center gap-2 border border-white/15 px-3 py-2 text-sm text-gray-400 transition-colors hover:border-white/40 hover:text-white md:mt-4"
             />
             {isOwnerView ? (
               <button
@@ -478,14 +538,15 @@ export function PublicMediaPage({ profile, item, publicItems }) {
         </div>
 
         {isMusic && (
-          <div className="mx-auto mb-6 flex max-w-5xl justify-center">
-            <div className="w-full max-w-sm shrink-0">
+          <div className="mx-auto mb-4 flex max-w-5xl justify-center md:mb-6">
+            <div className="w-full max-w-[18rem] shrink-0 md:max-w-sm">
               <div className="aspect-square w-full overflow-hidden border border-white/10 bg-black">
                 {displayedItem.coverAsset?.url ? (
-                  <img
+                  <FadeInImage
                     src={displayedItem.coverAsset.url}
                     alt={displayTitle}
                     className="h-full w-full object-cover"
+                    containerClassName="h-full w-full"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))]">
@@ -505,9 +566,6 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                   <div className="flex flex-wrap gap-2">
                     <span className="border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-300">
                         {formatReleaseType(displayedItem.releaseType)}
-                      </span>
-                      <span className="border border-white/10 bg-white/[0.02] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-500">
-                        {displayedItem.asset?.mimeType?.replace("/", " / ") || "audio"}
                       </span>
                     </div>
 
@@ -579,15 +637,15 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                           );
 
                           return (
-                            <div
+                          <div
                               key={track.id}
-                              className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 border border-white/10 bg-black/20 px-3 py-3"
+                              className="grid grid-cols-[2.25rem_minmax(0,1fr)_1.5rem] items-center gap-2.5 border border-white/10 bg-black/20 px-2.5 py-2 md:px-3"
                             >
                               <button
                                 type="button"
                                 onClick={() => handlePlayReleaseTrack(track)}
                                 disabled={!track.asset?.url}
-                                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/[0.03] transition-colors hover:border-white/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-white/[0.03] transition-colors hover:border-white/45 disabled:cursor-not-allowed disabled:opacity-50"
                                 aria-label={`${isReleaseTrackPlaying ? "Pause" : "Play"} ${track.title}`}
                               >
                                 {isReleaseTrackPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
@@ -601,16 +659,13 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                                   <span className="block truncate text-sm">
                                     {track.trackNumber || index + 1}. {track.title}
                                   </span>
-                                  <span className="mt-0.5 block truncate text-[11px] uppercase tracking-[0.14em] text-gray-500">
-                                    {track.asset?.fileName || track.asset?.mimeType || "audio"}
-                                  </span>
                                 </Link>
-                                <div className="mt-2 overflow-hidden border border-white/10 bg-white/[0.02] px-2 py-1.5">
+                                <div className="mt-1 overflow-hidden border border-white/10 bg-white/[0.02] px-2 py-1">
                                   <Waveform
                                     data={releaseTrackWaveformData}
                                     audioUrl={track.asset?.url}
                                     isPlaying={isReleaseTrackPlaying}
-                                    height={30}
+                                    height={20}
                                     progress={releaseTrackProgress}
                                     currentTime={releaseTrackCurrentTime}
                                     duration={releaseTrackDuration}
@@ -621,8 +676,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-gray-500">
-                                {track.asset?.fileSizeBytes ? <span>{formatFileSize(track.asset.fileSizeBytes)}</span> : null}
+                              <div className="flex items-center justify-end text-gray-500">
                                 <button
                                   type="button"
                                   onClick={() => handleAddReleaseTrackToQueue(track)}
@@ -643,17 +697,17 @@ export function PublicMediaPage({ profile, item, publicItems }) {
             )}
 
             {!isMusic && displayedItem.mediaKind === "visual" && (
-              <div className="flex justify-center p-5 md:p-8">
+              <div className="flex justify-center p-4 md:p-8">
                 <button
                   type="button"
                   onClick={openGallery}
-                  className="block w-full max-w-[42rem] cursor-pointer text-left"
+                  className="inline-flex max-w-full cursor-pointer justify-center text-left"
                 >
                   {displayedItem.asset?.url ? (
-                    <VisualImageFrame
+                    <FadeInImage
                       src={displayedItem.asset.url}
                       alt={displayTitle}
-                      className="h-[min(34rem,72vw)] min-h-[18rem] w-full"
+                      className="h-auto max-h-[78vh] max-w-full object-contain"
                     />
                   ) : (
                     <div className="flex min-h-[20rem] items-center justify-center">
@@ -699,36 +753,38 @@ export function PublicMediaPage({ profile, item, publicItems }) {
         <div>
           <h2 className="mb-6 text-xl">more from @{profile.username}</h2>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {relatedItems.map((relatedItem) => (
-              <Link
-                key={relatedItem.id}
-                href={buildPublicMediaPath(profile.username, relatedItem.slug)}
-                className="group block cursor-pointer border border-white/20 bg-white/5 p-4 transition-colors hover:border-white/40 hover:bg-white/[0.08]"
-              >
-                <div className="mb-3 aspect-square overflow-hidden border border-white/10 bg-black">
-                  {relatedItem.coverAsset?.url ? (
-                    <img
-                      src={relatedItem.coverAsset.url}
-                      alt={relatedItem.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-white/[0.03]">
-                      {relatedItem.mediaKind === "music" ? (
-                        <Music2 className="h-10 w-10 text-white/25" />
-                      ) : relatedItem.mediaKind === "visual" ? (
-                        <Palette className="h-10 w-10 text-white/25" />
-                      ) : (
-                        <Video className="h-10 w-10 text-white/25" />
-                      )}
+            {relatedItems.map((relatedItem) => {
+              const previewUrl = getRelatedItemPreviewUrl(relatedItem);
+
+              return (
+                <Link
+                  key={relatedItem.id}
+                  href={buildPublicMediaPath(profile.username, relatedItem.slug)}
+                  className="group block cursor-pointer border border-white/20 bg-white/5 p-4 transition-colors hover:border-white/40 hover:bg-white/[0.08]"
+                >
+                  <div className="relative mb-3 aspect-square overflow-hidden border border-white/10 bg-black">
+                    {previewUrl ? (
+                      <FadeInImage
+                        src={previewUrl}
+                        alt={getMediaDisplayTitle(relatedItem)}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        containerClassName="h-full w-full"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-white/[0.06] text-white/60">
+                        {getRelatedItemIcon(relatedItem.mediaKind, "h-10 w-10")}
+                      </div>
+                    )}
+                    <div className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center border border-white/15 bg-black/75 text-white/80 backdrop-blur-sm">
+                      {getRelatedItemIcon(relatedItem.mediaKind)}
                     </div>
-                  )}
-                </div>
-                <h3 className="text-sm transition-colors group-hover:text-gray-200">
-                  {relatedItem.title}
-                </h3>
-              </Link>
-            ))}
+                  </div>
+                  <h3 className="text-sm transition-colors group-hover:text-gray-200">
+                    {getMediaDisplayTitle(relatedItem)}
+                  </h3>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

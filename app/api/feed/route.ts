@@ -4,6 +4,7 @@ import { ensureAppUser, ensureProfile, getAuthContext } from "@/lib/supabase/app
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const IMAGE_PREVIEW_WIDTH = 900;
 const MAX_FEED_ITEMS = 50;
 const DISCOVERY_SAMPLE_SIZE = 160;
 
@@ -53,11 +54,15 @@ async function createSignedAssetPayload(
     mime_type: string;
     file_size_bytes: number;
   },
+  options: { previewWidth?: number } = {},
 ) {
   let assetUrl: string | null = null;
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from(asset.bucket)
-    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS);
+  const signedUrlOptions =
+    options.previewWidth && asset.mime_type?.startsWith("image/")
+      ? { transform: { width: options.previewWidth, resize: "contain" as const } }
+      : undefined;
+  const { data: signedData, error: signedError } = await (supabase.storage.from(asset.bucket) as any)
+    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS, signedUrlOptions);
 
   if (!signedError) {
     assetUrl = signedData?.signedUrl ?? null;
@@ -161,6 +166,7 @@ export async function GET(request: Request) {
       .filter((value): value is string => Boolean(value));
 
     const mediaAssetsById = new Map<string, Record<string, unknown>>();
+    const previewAssetsById = new Map<string, Record<string, unknown>>();
     const coverAssetsByItemId = new Map<string, Record<string, unknown>>();
     const collectionTitleById = new Map<string, string>();
     const trackNumberByItemId = new Map<string, number | null>();
@@ -185,10 +191,19 @@ export async function GET(request: Request) {
 
         if (asset.role === "original") {
           mediaAssetsById.set(asset.id, signedAsset);
+          if (asset.mime_type?.startsWith("image/")) {
+            previewAssetsById.set(
+              asset.id,
+              await createSignedAssetPayload(supabase, asset, { previewWidth: IMAGE_PREVIEW_WIDTH }),
+            );
+          }
         }
 
         if (asset.role === "thumbnail" && asset.media_item_id) {
-          coverAssetsByItemId.set(asset.media_item_id, signedAsset);
+          coverAssetsByItemId.set(
+            asset.media_item_id,
+            await createSignedAssetPayload(supabase, asset, { previewWidth: IMAGE_PREVIEW_WIDTH }),
+          );
         }
       }
 
@@ -334,6 +349,7 @@ export async function GET(request: Request) {
           trackNumber: trackNumberByItemId.get(item.id) ?? null,
           slug,
           asset: item.primary_asset_id ? mediaAssetsById.get(item.primary_asset_id) ?? null : null,
+          previewAsset: item.primary_asset_id ? previewAssetsById.get(item.primary_asset_id) ?? null : null,
           coverAsset: coverAssetsByItemId.get(item.id) ?? null,
           artist: {
             userId: artist.userId,

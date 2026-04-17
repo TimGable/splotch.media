@@ -6,8 +6,8 @@ import { MediaSocialPanel } from "./media-social-panel";
 import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
 import { VideoPlayer } from "./video-player";
 import { MentionText } from "./mention-text";
-import { VisualImageFrame } from "./visual-image-frame";
 import { ShareLinkButton } from "./share-link-button";
+import { FadeInImage } from "./fade-in-image";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
 
 function formatTime(seconds) {
@@ -65,6 +65,10 @@ function getMediaDisplayTitle(item) {
   return isMultiTrackReleaseItem(item) ? item.collectionTitle || item.title : item.title;
 }
 
+function cleanReleaseDescription(description) {
+  return String(description || "").replace(/^From (EP|Album) ".*?"\.\s*/i, "").trim();
+}
+
 export function MediaItemPage({
   item,
   isPlaying,
@@ -86,6 +90,7 @@ export function MediaItemPage({
   const waveformData = buildWaveformData(`${item.id}:${item.asset?.fileName || item.title}`);
   const progress = duration > 0 ? currentTime / duration : 0;
   const displayTitle = getMediaDisplayTitle(item);
+  const displayDescription = cleanReleaseDescription(item.description);
   const sharePath =
     profile?.username && item?.slug ? buildPublicMediaPath(profile.username, item.slug) : "";
   const shareUrl =
@@ -116,26 +121,26 @@ export function MediaItemPage({
 
   return (
     <div>
-      <div className="border border-white/20 bg-black/35 p-6 md:p-8">
-        <div className="mb-8 flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-start md:justify-between">
+      <div className="border border-white/20 bg-black/35 p-4 md:p-8">
+        <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 md:mb-8 md:flex-row md:items-start md:justify-between md:gap-4 md:pb-6">
           <div>
             <motion.button
               type="button"
               onClick={onBack}
-              className="mb-4 text-sm text-gray-400 transition-colors hover:text-white"
+              className="mb-3 text-sm text-gray-400 transition-colors hover:text-white md:mb-4"
               whileHover={{ x: -4 }}
               whileTap={{ scale: 0.97 }}
             >
               <span aria-hidden="true">{"\u2190"}</span>
               <span className="ml-2">back</span>
             </motion.button>
-            <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-gray-500">
+            <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-gray-500 md:mb-3 md:text-[11px] md:tracking-[0.22em]">
               {kindLabel(item.mediaKind)}
             </p>
-            <h3 className="max-w-4xl text-3xl leading-tight md:text-5xl">{displayTitle}</h3>
-            {item.description && (
-              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-400 md:text-base">
-                <MentionText text={item.description} />
+            <h3 className="max-w-4xl text-2xl leading-tight md:text-5xl">{displayTitle}</h3>
+            {displayDescription && (
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-400 md:mt-4 md:text-base">
+                <MentionText text={displayDescription} />
               </p>
             )}
           </div>
@@ -145,7 +150,7 @@ export function MediaItemPage({
               <ShareLinkButton
                 url={shareUrl}
                 label="share post"
-                className="inline-flex items-center gap-2 border border-white/15 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+                className="inline-flex items-center gap-2 border border-white/15 px-3 py-2 text-sm text-gray-400 transition-colors hover:border-white/40 hover:text-white"
               />
             ) : null}
             <button
@@ -163,12 +168,13 @@ export function MediaItemPage({
           <div className="overflow-hidden border border-white/10 bg-white/[0.03]">
             {item.mediaKind === "music" && (
               <div className="flex flex-col md:flex-row">
-                <div className="aspect-square w-full border-b border-white/10 bg-white/[0.04] md:w-48 md:flex-shrink-0 md:border-b-0 md:border-r">
+                <div className="mx-auto aspect-square w-full max-w-[18rem] border-b border-white/10 bg-white/[0.04] md:mx-0 md:w-48 md:flex-shrink-0 md:border-b-0 md:border-r">
                   {item.coverAsset?.url ? (
-                    <img
+                    <FadeInImage
                       src={item.coverAsset.url}
                       alt={displayTitle}
                       className="h-full w-full object-cover"
+                      containerClassName="h-full w-full"
                       style={{
                         WebkitMaskImage:
                           "radial-gradient(circle at center, black 68%, rgba(0,0,0,0.92) 78%, transparent 100%)",
@@ -253,17 +259,17 @@ export function MediaItemPage({
             )}
 
             {item.mediaKind === "visual" && (
-              <div className="flex justify-center p-5 md:p-8">
+              <div className="flex justify-center p-4 md:p-8">
                 <button
                   type="button"
                   onClick={openPreviewLightbox}
-                  className="block w-full max-w-[42rem] cursor-pointer text-left"
+                  className="inline-flex max-w-full cursor-pointer justify-center text-left"
                 >
                   {item.asset?.url ? (
-                    <VisualImageFrame
+                    <FadeInImage
                       src={item.asset.url}
                       alt={displayTitle}
-                      className="h-[min(34rem,72vw)] min-h-[18rem] w-full"
+                      className="h-auto max-h-[78vh] max-w-full object-contain"
                     />
                   ) : (
                     <div className="flex min-h-[20rem] items-center justify-center">

@@ -3,15 +3,20 @@ import { attachPublicMediaSlugs } from "@/lib/media-slugs";
 import { getMediaSocialSummary } from "@/lib/media-social";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const IMAGE_PREVIEW_WIDTH = 900;
+const LIKE_PREVIEW_WIDTH = 320;
 
 type VisibilityLevel = "public" | "unlisted";
 
 type PublicLikedTrack = {
   id: string;
   title: string;
+  mediaKind: string;
+  releaseType: string | null;
   slug: string;
   likedAt: string | null;
   coverArtUrl: string | null;
+  previewUrl: string | null;
   artist: {
     username: string;
     displayName: string;
@@ -45,11 +50,15 @@ async function createSignedAssetPayload(
     mime_type: string;
     file_size_bytes: number;
   },
+  options: { previewWidth?: number } = {},
 ) {
   let assetUrl: string | null = null;
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from(asset.bucket)
-    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS);
+  const signedUrlOptions =
+    options.previewWidth && asset.mime_type?.startsWith("image/")
+      ? { transform: { width: options.previewWidth, resize: "contain" as const } }
+      : undefined;
+  const { data: signedData, error: signedError } = await (supabase.storage.from(asset.bucket) as any)
+    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS, signedUrlOptions);
 
   if (!signedError) {
     assetUrl = signedData?.signedUrl ?? null;
@@ -181,6 +190,7 @@ async function loadMediaItems(
   const itemIds = (mediaItems ?? []).map((item) => item.id);
   const socialSummaryByItemId = await getMediaSocialSummary(supabase, itemIds);
   const primaryAssetsById = new Map<string, Record<string, unknown>>();
+  const previewAssetsById = new Map<string, Record<string, unknown>>();
   const coverAssetsByItemId = new Map<string, Record<string, unknown>>();
   const collectionTitleById = new Map<string, string>();
   const trackNumberByItemId = new Map<string, number | null>();
@@ -201,10 +211,19 @@ async function loadMediaItems(
 
       if (asset.role === "original") {
         primaryAssetsById.set(asset.id, signedAsset);
+        if (asset.mime_type?.startsWith("image/")) {
+          previewAssetsById.set(
+            asset.id,
+            await createSignedAssetPayload(supabase, asset, { previewWidth: IMAGE_PREVIEW_WIDTH }),
+          );
+        }
       }
 
       if (asset.role === "thumbnail" && asset.media_item_id) {
-        coverAssetsByItemId.set(asset.media_item_id, signedAsset);
+        coverAssetsByItemId.set(
+          asset.media_item_id,
+          await createSignedAssetPayload(supabase, asset, { previewWidth: IMAGE_PREVIEW_WIDTH }),
+        );
       }
     }
 
@@ -254,6 +273,7 @@ async function loadMediaItems(
       durationMs: item.duration_ms,
       trackNumber: trackNumberByItemId.get(item.id) ?? null,
       asset: item.primary_asset_id ? primaryAssetsById.get(item.primary_asset_id) ?? null : null,
+      previewAsset: item.primary_asset_id ? previewAssetsById.get(item.primary_asset_id) ?? null : null,
       coverAsset: coverAssetsByItemId.get(item.id) ?? null,
       likes: socialSummaryByItemId.get(item.id)?.likes || 0,
       comments: socialSummaryByItemId.get(item.id)?.comments || 0,
@@ -288,7 +308,6 @@ async function loadLikedTracks(
       "id, owner_user_id, collection_id, music_release_type, title, media_kind, visibility, state, published_at, primary_asset_id",
     )
     .in("id", mediaItemIds)
-    .eq("media_kind", "music")
     .eq("visibility", "public")
     .eq("state", "ready");
 
@@ -322,13 +341,14 @@ async function loadLikedTracks(
   }
 
   const coverAssetsByItemId = new Map<string, Record<string, unknown>>();
+  const originalAssetsByItemId = new Map<string, Record<string, unknown>>();
 
   if (filteredItems.length > 0) {
     const { data: coverAssets, error: coverAssetsError } = await supabase
       .from("media_assets")
-      .select("id, media_item_id, bucket, object_key, file_name, mime_type, file_size_bytes")
+      .select("id, media_item_id, role, bucket, object_key, file_name, mime_type, file_size_bytes")
       .in("media_item_id", filteredItems.map((item) => item.id))
-      .eq("role", "thumbnail");
+      .in("role", ["thumbnail", "original"]);
 
     if (coverAssetsError) {
       throw new Error(coverAssetsError.message);
@@ -339,8 +359,20 @@ async function loadLikedTracks(
         continue;
       }
 
-      const signedAsset = await createSignedAssetPayload(supabase, asset);
-      coverAssetsByItemId.set(asset.media_item_id, signedAsset);
+      const signedAsset = await createSignedAssetPayload(supabase, asset, { previewWidth: LIKE_PREVIEW_WIDTH });
+      if (asset.role === "thumbnail") {
+        coverAssetsByItemId.set(asset.media_item_id, signedAsset);
+      }
+      if (
+        asset.role === "original" &&
+        asset.mime_type?.startsWith("image/") &&
+        !originalAssetsByItemId.has(asset.media_item_id)
+      ) {
+        originalAssetsByItemId.set(
+          asset.media_item_id,
+          await createSignedAssetPayload(supabase, asset, { previewWidth: LIKE_PREVIEW_WIDTH }),
+        );
+      }
     }
   }
 
@@ -349,7 +381,6 @@ async function loadLikedTracks(
     .from("media_items")
     .select("id, owner_user_id, collection_id, music_release_type, title")
     .in("owner_user_id", ownerIds)
-    .eq("media_kind", "music")
     .eq("visibility", "public")
     .eq("state", "ready");
 
@@ -395,7 +426,11 @@ async function loadLikedTracks(
     (likedRows ?? []).map((row) => [row.media_item_id, row.created_at]),
   );
 
-  return filteredItems
+  const itemById = new Map(filteredItems.map((item) => [item.id, item]));
+
+  return mediaItemIds
+    .map((mediaItemId) => itemById.get(mediaItemId))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .map((item) => {
       const owner = ownerProfilesById.get(item.owner_user_id);
       if (!owner) {
@@ -404,10 +439,19 @@ async function loadLikedTracks(
 
       const track: PublicLikedTrack = {
         id: item.id,
-        title: item.title,
+        title:
+          item.collection_id && item.music_release_type && item.music_release_type !== "single"
+            ? ownerPublicCollectionTitleById.get(item.collection_id) || item.title
+            : item.title,
+        mediaKind: item.media_kind,
+        releaseType: item.music_release_type,
         slug: slugMap.get(item.id) || "",
         likedAt: likedCreatedAtByItemId.get(item.id) || item.published_at || null,
         coverArtUrl: (coverAssetsByItemId.get(item.id) as { url?: string } | undefined)?.url || null,
+        previewUrl:
+          (coverAssetsByItemId.get(item.id) as { url?: string } | undefined)?.url ||
+          (originalAssetsByItemId.get(item.id) as { url?: string } | undefined)?.url ||
+          null,
         artist: {
           username: owner.username,
           displayName: owner.displayName,

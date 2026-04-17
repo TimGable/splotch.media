@@ -165,7 +165,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
         <InteractiveBackground />
         
         {/* Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 py-12">
+        <div className="relative z-10 max-w-7xl mx-auto px-5 py-8 md:px-6 md:py-12">
           <AnimatePresence mode="wait">
             {selectedCategory === 'music' ? (
               <motion.div
@@ -225,7 +225,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                 />
               </motion.div>
             ) : (
-              <div className="text-center flex items-center justify-center min-h-[60vh]">
+              <div className="text-center flex items-center justify-center min-h-[52vh] md:min-h-[60vh]">
                 <motion.div
                   key="landing"
                   className="w-full"
@@ -236,23 +236,25 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                 >
                   {/* Logo/Brand */}
                   <motion.div 
-                    className="mb-12"
+                    className="mb-8 md:mb-12"
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...PAGE_TRANSITION, delay: 0.12 }}
                   >
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl tracking-tight">splotch</h1>
-                    <p className="mt-3 text-xs uppercase tracking-[0.3em] text-gray-500 md:text-sm">
+                    <h1 className="text-3xl tracking-tight md:text-5xl lg:text-6xl">splotch</h1>
+                    <p className="mt-2 text-[11px] uppercase tracking-[0.26em] text-gray-500 md:mt-3 md:text-sm md:tracking-[0.3em]">
                       our media archive
                     </p>
-                    <div className="mx-auto mt-8 w-full max-w-[28rem] md:max-w-[34rem]">
+                    <div className="mx-auto mt-6 w-full max-w-[22rem] md:mt-8 md:max-w-[34rem]">
                       <SiteSearch />
                     </div>
                   </motion.div>
 
                   {/* CTA Buttons */}
                   <motion.div 
-                    className="mx-auto mb-16 flex w-full flex-col items-center px-4"
+                    className={`relative mx-auto mb-10 flex w-full flex-col items-center px-2 transition-[padding] duration-300 md:mb-16 md:px-4 ${
+                      showAbout ? 'pb-[17rem] md:pb-[14rem]' : 'pb-0'
+                    }`}
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...PAGE_TRANSITION, delay: 0.2 }}
@@ -260,7 +262,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                     {/* Browse Artists - Big Button */}
                     <motion.button
                       onClick={() => navigateLanding("categories")}
-                      className="group relative flex h-[5.75rem] w-full max-w-[22rem] items-center justify-center overflow-hidden border-2 border-white bg-transparent px-8 transition-all duration-300 active:scale-95 touch-manipulation md:h-[7rem] md:max-w-[34rem] md:px-12"
+                      className="group relative flex h-16 w-full max-w-[22rem] items-center justify-center overflow-hidden border-2 border-white bg-transparent px-8 transition-all duration-300 active:scale-95 touch-manipulation md:h-[7rem] md:max-w-[34rem] md:px-12"
                       onHoverStart={() => {
                         if (supportsHoverMotion) setHoveredButton('browse');
                       }}
@@ -278,7 +280,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                         style={{ originX: 0 }}
                       />
                       <motion.span 
-                        className="relative z-10 text-xl md:text-2xl tracking-wide"
+                        className="relative z-10 text-base tracking-wide md:text-2xl"
                         animate={{ 
                           color: hoveredButton === 'browse' ? '#000000' : '#ffffff',
                           letterSpacing: hoveredButton === 'browse' ? '0.1em' : '0.025em'
@@ -291,13 +293,13 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                   
                     {/* Sign In and Request Invite - Smaller Buttons Side by Side */}
                     <motion.div 
-                      className="mt-4 flex w-full flex-col items-center gap-4 md:mt-5 md:flex-row md:justify-center md:gap-5"
+                      className="mt-3 flex w-full flex-col items-center gap-3 md:mt-5 md:flex-row md:justify-center md:gap-5"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ ...PAGE_TRANSITION, delay: 0.28 }}
                     >
                       <motion.button 
-                        className="group relative flex h-[5.25rem] w-full max-w-[22rem] items-center justify-center overflow-hidden border border-white/40 bg-white/5 px-5 transition-all duration-200 hover:border-white/60 hover:bg-white/15 active:scale-95 touch-manipulation md:w-[16rem] md:max-w-none md:px-7"
+                        className="group relative flex h-14 w-full max-w-[22rem] items-center justify-center overflow-hidden border border-white/40 bg-white/5 px-5 transition-all duration-200 hover:border-white/60 hover:bg-white/15 active:scale-95 touch-manipulation md:h-[5.25rem] md:w-[16rem] md:max-w-none md:px-7"
                         onClick={() => navigateLanding("sign-in")}
                         whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
                         whileTap={SOFT_BUTTON_TAP}
@@ -314,7 +316,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                       </motion.button>
                     
                       <motion.button 
-                        className="group relative flex h-[5.25rem] w-full max-w-[22rem] items-center justify-center overflow-hidden border border-white/40 bg-white/5 px-5 transition-all duration-200 hover:border-white/60 hover:bg-white/15 active:scale-95 touch-manipulation md:w-[16rem] md:max-w-none md:px-7"
+                        className="group relative flex h-14 w-full max-w-[22rem] items-center justify-center overflow-hidden border border-white/40 bg-white/5 px-5 transition-all duration-200 hover:border-white/60 hover:bg-white/15 active:scale-95 touch-manipulation md:h-[5.25rem] md:w-[16rem] md:max-w-none md:px-7"
                         onClick={() => navigateLanding("request-invite")}
                         whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
                         whileTap={SOFT_BUTTON_TAP}
@@ -332,74 +334,63 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                     </motion.div>
 
                     {/* About Button */}
-                    <motion.button
-                      onClick={() => setShowAbout(!showAbout)}
-                      className="relative group mx-auto mt-5 flex h-10 w-28 items-center justify-center overflow-hidden border border-white/20 px-6 transition-all duration-300 hover:border-white/40 touch-manipulation"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ ...PAGE_TRANSITION, delay: 0.32 }}
-                      whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
-                      whileTap={SOFT_BUTTON_TAP}
-                    >
-                      <span className="relative z-10 text-xs md:text-sm tracking-widest text-gray-400 group-hover:text-white transition-colors">
-                        {showAbout ? 'close' : 'about'}
-                      </span>
-                      <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5"
-                        initial={{ x: '-100%' }}
-                        whileHover={{ x: '100%' }}
-                        transition={PAGE_TRANSITION}
-                      />
-                    </motion.button>
-                  </motion.div>
-
-                  {/* About Content Box - Positioned absolutely below buttons */}
-                  <AnimatePresence>
-                    {showAbout && (
-                      <motion.div
-                        className="w-full max-w-lg mx-auto px-4 overflow-hidden"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ 
-                          ...PAGE_TRANSITION,
-                        }}
+                    <div className="relative mx-auto mt-3 w-full max-w-[22rem] md:mt-5 md:w-28 md:max-w-none">
+                      <motion.button
+                        onClick={() => setShowAbout(!showAbout)}
+                        className="relative group flex h-11 w-full items-center justify-center overflow-hidden border border-white/20 px-5 transition-all duration-300 hover:border-white/40 touch-manipulation md:h-10"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ ...PAGE_TRANSITION, delay: 0.32 }}
+                        whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
+                        whileTap={SOFT_BUTTON_TAP}
                       >
-                        <motion.div 
-                          className="pt-4 space-y-5 text-gray-300 leading-relaxed"
-                          initial={{ y: -10, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: -10, opacity: 0 }}
-                          transition={{ 
-                            ...PAGE_TRANSITION,
-                            delay: 0.1
-                          }}
-                        >
-                          <p className="text-center md:text-left">
-                            splotch is a community based, independently operated media platform for artists of all kinds.
-                          </p>
-                          
-                          <p className="text-center md:text-left">
-                            we are currently invite only, but hope to open our platform up to all artists at some point in the future.
-                          </p>
-                          
-                          <p className="text-center md:text-left">
-                            if you have more questions, feel free to email me at{' '}
-                            <a
-                              href="mailto:1timgable@gmail.com"
-                              className="text-white underline hover:text-gray-400 transition-colors"
-                            >
-                              1timgable@gmail.com
-                            </a>
-                          </p>
-                          
-                          <p className="text-sm text-gray-500 italic text-center md:text-left pb-4">
-                            thank you for visiting!
-                          </p>
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                        <span className="relative z-10 text-xs tracking-wide text-gray-400 transition-colors group-hover:text-white md:text-sm md:tracking-widest">
+                          {showAbout ? 'close' : 'about'}
+                        </span>
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5"
+                          initial={{ x: '-100%' }}
+                          whileHover={{ x: '100%' }}
+                          transition={PAGE_TRANSITION}
+                        />
+                      </motion.button>
+                      <AnimatePresence>
+                        {showAbout && (
+                          <motion.div
+                            className="absolute left-1/2 top-[calc(100%+1rem)] z-20 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden border border-white/15 bg-black/90 px-4 py-4 text-sm shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl md:text-base"
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={PAGE_TRANSITION}
+                          >
+                            <div className="space-y-4 text-gray-300 leading-relaxed">
+                              <p className="text-center md:text-left">
+                                splotch is a community based, independently operated media platform for artists of all kinds.
+                              </p>
+
+                              <p className="text-center md:text-left">
+                                we are currently invite only, but hope to open our platform up to all artists at some point in the future.
+                              </p>
+
+                              <p className="text-center md:text-left">
+                                if you have more questions, feel free to email me at{' '}
+                                <a
+                                  href="mailto:1timgable@gmail.com"
+                                  className="text-white underline hover:text-gray-400 transition-colors"
+                                >
+                                  1timgable@gmail.com
+                                </a>
+                              </p>
+
+                              <p className="text-sm text-gray-500 italic text-center md:text-left">
+                                thank you for visiting!
+                              </p>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
                 </motion.div>
               </div>
             )}

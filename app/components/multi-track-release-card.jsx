@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { Check, Copy, Disc3, Edit2, Ellipsis, Heart, ListPlus, MessageCircle, Pause, Play, Share2 } from "lucide-react";
 import { MentionText } from "./mention-text";
 import { Waveform } from "./waveform";
+import { FadeInImage } from "./fade-in-image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,36 +112,37 @@ export function MultiTrackReleaseCard({
       whileHover={SOFT_CARD_HOVER}
       transition={PAGE_TRANSITION}
     >
-      <div className="p-4 md:p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-5">
+      <div className="p-3 md:p-5">
+        <div className="relative grid gap-3 md:flex md:flex-row md:items-center md:gap-5">
           <motion.button
             type="button"
             onClick={() => firstTrack && onOpen?.(firstTrack)}
-            className="relative mx-auto aspect-square w-32 flex-shrink-0 overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] text-left transition-opacity hover:opacity-95 md:mx-0 md:h-40 md:w-40"
+            className="absolute left-0 top-0 h-16 w-16 flex-shrink-0 overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] text-left transition-opacity hover:opacity-95 sm:h-20 sm:w-20 md:relative md:left-auto md:top-auto md:h-40 md:w-40"
             whileHover={SOFT_CARD_HOVER}
             whileTap={SOFT_BUTTON_TAP}
           >
             {coverUrl ? (
-              <img src={coverUrl} alt={release.title} className="h-full w-full object-cover object-center" />
+              <FadeInImage
+                src={coverUrl}
+                alt={release.title}
+                className="h-full w-full object-cover object-center"
+                containerClassName="h-full w-full"
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))]">
-                <Disc3 className="h-14 w-14 text-white/40" />
+                <Disc3 className="h-8 w-8 text-white/40 md:h-14 md:w-14" />
               </div>
             )}
-            <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/80 px-3 py-2 text-center text-[10px] uppercase leading-none tracking-[0.12em] text-white">
-              <span className="block text-base font-semibold tracking-normal">{tracks.length}</span>
-              <span>tracks</span>
-            </div>
           </motion.button>
 
           <div className="min-w-0 flex-1">
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-3 ml-20 flex min-h-16 items-start justify-between gap-2 sm:ml-24 sm:min-h-20 md:mb-4 md:ml-0 md:min-h-0 md:gap-3">
               <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <span className="border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-300">
+                <div className="mb-1.5 hidden flex-wrap gap-2 sm:flex md:mb-2">
+                  <span className="border border-white/15 bg-white/[0.03] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-300 md:px-2.5 md:text-[11px] md:tracking-[0.2em]">
                     {formatReleaseType(release.releaseType)}
                   </span>
-                  <span className="border border-white/10 bg-white/[0.02] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-500">
+                  <span className="border border-white/10 bg-white/[0.02] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-500 md:px-2.5 md:text-[11px] md:tracking-[0.2em]">
                     {formatTrackCount(tracks.length)}
                   </span>
                 </div>
@@ -148,7 +150,7 @@ export function MultiTrackReleaseCard({
                 <motion.button
                   type="button"
                   onClick={() => firstTrack && onOpen?.(firstTrack)}
-                  className="cursor-pointer text-left text-lg leading-tight transition-colors hover:text-gray-300"
+                  className="cursor-pointer text-left text-sm leading-tight transition-colors hover:text-gray-300 sm:text-base md:text-lg"
                   whileHover={SOFT_BUTTON_HOVER}
                   whileTap={SOFT_BUTTON_TAP}
                 >
@@ -156,7 +158,7 @@ export function MultiTrackReleaseCard({
                 </motion.button>
 
                 {release.description ? (
-                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">
+                  <p className="mt-2 hidden max-w-2xl text-sm leading-relaxed text-gray-400 md:block">
                     <MentionText text={release.description} />
                   </p>
                 ) : null}
@@ -168,7 +170,7 @@ export function MultiTrackReleaseCard({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="flex h-10 w-10 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+                        className="flex h-8 w-8 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white md:h-10 md:w-10"
                         aria-label={`Open release options for ${release.title}`}
                       >
                         <Ellipsis className="h-4 w-4" />
@@ -181,7 +183,7 @@ export function MultiTrackReleaseCard({
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2.5 whitespace-nowrap px-3 py-2 text-white focus:bg-white/10 focus:text-white">
                           <Share2 className="h-4 w-4 text-gray-400" />
-                          <span>share release</span>
+                          <span>share post</span>
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="w-[min(24rem,calc(100vw-3rem))] border-white/15 bg-black text-white">
                           <div className="space-y-3 p-2">
@@ -214,13 +216,13 @@ export function MultiTrackReleaseCard({
                 return (
                   <div
                     key={track.id}
-                    className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-white/10 px-3 py-2.5 last:border-b-0"
+                    className="grid grid-cols-[2rem_minmax(0,1fr)_1.5rem] items-center gap-2 border-b border-white/10 px-2 py-1.5 last:border-b-0 md:grid-cols-[2.25rem_minmax(0,1fr)_1.5rem] md:gap-2.5 md:px-3 md:py-2"
                   >
                     <motion.button
                       type="button"
                       onClick={() => onPlayTrack?.(track, tracks)}
                       disabled={!track.asset?.url}
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/[0.03] text-white transition-colors hover:border-white/45 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-white/[0.03] text-white transition-colors hover:border-white/45 disabled:cursor-not-allowed disabled:opacity-50"
                       whileHover={SOFT_BUTTON_HOVER}
                       whileTap={SOFT_BUTTON_TAP}
                       aria-label={`${isTrackPlaying ? "Pause" : "Play"} ${track.title}`}
@@ -236,22 +238,18 @@ export function MultiTrackReleaseCard({
                       <span className="block truncate text-sm text-white">
                         {index + 1}. {track.title}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] uppercase tracking-[0.14em] text-gray-500">
-                        {track.asset?.fileName || track.asset?.mimeType || "audio"}
-                      </span>
-                      <div className="mt-2 overflow-hidden border border-white/10 bg-white/[0.02] px-2 py-1.5">
+                      <div className="mt-1 overflow-hidden border border-white/10 bg-white/[0.02] px-1.5 py-0.5 md:px-2 md:py-1">
                         <Waveform
                           data={buildWaveformData(`${track.id}:${track.asset?.fileName || track.title}`)}
                           audioUrl={track.asset?.url}
                           isPlaying={isTrackPlaying}
-                          height={24}
+                          height={16}
                           disabled
                         />
                       </div>
                     </button>
 
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-gray-500">
-                      {track.asset?.fileSizeBytes ? <span>{formatFileSize(track.asset.fileSizeBytes)}</span> : null}
+                    <div className="flex items-center justify-end text-gray-500">
                       {onAddTrackToQueue ? (
                         <motion.button
                           type="button"

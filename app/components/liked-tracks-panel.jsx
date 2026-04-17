@@ -2,8 +2,33 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Heart, Music2 } from "lucide-react";
+import { Heart, Music2, Palette, Video } from "lucide-react";
+import { FadeInImage } from "./fade-in-image";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
+
+function getLikedItemIcon(mediaKind) {
+  if (mediaKind === "visual") {
+    return <Palette className="h-4 w-4 text-white/50" />;
+  }
+
+  if (mediaKind === "video") {
+    return <Video className="h-4 w-4 text-white/50" />;
+  }
+
+  return <Music2 className="h-4 w-4 text-white/50" />;
+}
+
+function getLikedItemLabel(item) {
+  if (item.mediaKind === "music") {
+    if (item.releaseType === "album") return "album";
+    if (item.releaseType === "ep") return "EP";
+    return "song";
+  }
+
+  if (item.mediaKind === "visual") return "art";
+  if (item.mediaKind === "video") return "video";
+  return "post";
+}
 
 export function LikedTracksPanel({ likedTracks = [], onOpenTrack }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,25 +61,25 @@ export function LikedTracksPanel({ likedTracks = [], onOpenTrack }) {
         whileTap={SOFT_BUTTON_TAP}
       >
         <Heart className="h-4 w-4" />
-        <span className="uppercase tracking-[0.18em] text-[11px] text-gray-500">liked tracks</span>
+        <span className="uppercase tracking-[0.18em] text-[11px] text-gray-500">likes</span>
         <span className="text-white">{likedTracks.length}</span>
       </motion.button>
 
       <AnimatePresence>
         {isOpen ? (
           <motion.div
-            className="absolute bottom-0 right-0 z-20 w-[min(28rem,calc(100vw-3rem))] translate-y-[calc(100%+0.75rem)] overflow-hidden border border-white/15 bg-black/95 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+            className="absolute left-0 top-full z-40 mt-3 w-[min(18rem,calc(100vw-2rem))] overflow-hidden border border-white/15 bg-black/95 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl md:bottom-0 md:left-auto md:right-0 md:top-auto md:z-20 md:mt-0 md:w-[min(28rem,calc(100vw-3rem))] md:translate-y-[calc(100%+0.75rem)]"
             {...SOFT_PANEL_REVEAL}
             transition={PAGE_TRANSITION}
           >
             <div className="border-b border-white/10 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">
-                liked tracks
+                likes
               </p>
             </div>
 
             {likedTracks.length > 0 ? (
-              <div className="scrollbar-hidden max-h-[24rem] overflow-x-hidden overflow-y-auto">
+              <div className="scrollbar-hidden max-h-[calc(100dvh-10rem)] overflow-x-hidden overflow-y-auto md:max-h-[24rem]">
                 {likedTracks.map((track) => (
                   <motion.button
                     key={track.id}
@@ -68,21 +93,22 @@ export function LikedTracksPanel({ likedTracks = [], onOpenTrack }) {
                     whileTap={SOFT_BUTTON_TAP}
                   >
                     <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-white/[0.04]">
-                      {track.coverArtUrl ? (
-                        <img
-                          src={track.coverArtUrl}
+                      {track.previewUrl || track.coverArtUrl ? (
+                        <FadeInImage
+                          src={track.previewUrl || track.coverArtUrl}
                           alt={track.title}
                           className="h-full w-full object-cover"
+                          containerClassName="h-full w-full"
                         />
                       ) : (
-                        <Music2 className="h-4 w-4 text-white/50" />
+                        getLikedItemIcon(track.mediaKind)
                       )}
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-white">{track.title}</p>
                       <p className="truncate text-[11px] uppercase tracking-[0.16em] text-gray-500">
-                        {track.artist.displayName}
+                        {getLikedItemLabel(track)} / {track.artist.displayName}
                       </p>
                     </div>
                   </motion.button>
@@ -90,7 +116,7 @@ export function LikedTracksPanel({ likedTracks = [], onOpenTrack }) {
               </div>
             ) : (
               <div className="px-4 py-6 text-sm text-gray-500">
-                no liked tracks yet.
+                no likes yet.
               </div>
             )}
           </motion.div>

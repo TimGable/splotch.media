@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Check, Copy, Edit2, Ellipsis, Heart, ListPlus, MessageCircle, Music2, Pause, Play, Share2 } from "lucide-react";
 import { MentionText } from "./mention-text";
 import { Waveform } from "./waveform";
+import { FadeInImage } from "./fade-in-image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,20 +119,21 @@ export function MusicReleasePlayer({
       whileHover={SOFT_CARD_HOVER}
       transition={PAGE_TRANSITION}
     >
-      <div className="p-4 md:p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-5">
+      <div className="p-3 md:p-5">
+        <div className="relative grid gap-3 md:flex md:flex-row md:items-center md:gap-5">
           <motion.button
             type="button"
             onClick={() => onOpen(item)}
-            className="relative mx-auto aspect-square w-32 flex-shrink-0 overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] text-left transition-opacity hover:opacity-95 md:mx-0 md:h-40 md:w-40"
+            className="absolute left-0 top-0 h-16 w-16 flex-shrink-0 overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] text-left transition-opacity hover:opacity-95 sm:h-20 sm:w-20 md:relative md:left-auto md:top-auto md:h-40 md:w-40"
             whileHover={SOFT_CARD_HOVER}
             whileTap={SOFT_BUTTON_TAP}
           >
             {item.coverAsset?.url ? (
-              <img
+              <FadeInImage
                 src={item.coverAsset.url}
                 alt={item.title}
                 className="h-full w-full object-cover object-center"
+                containerClassName="h-full w-full"
                 style={{
                   WebkitMaskImage:
                     "radial-gradient(circle at center, black 68%, rgba(0,0,0,0.92) 78%, transparent 100%)",
@@ -141,29 +143,29 @@ export function MusicReleasePlayer({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))]">
-                <Music2 className="h-14 w-14 text-white/40" />
+                <Music2 className="h-8 w-8 text-white/40 md:h-14 md:w-14" />
               </div>
             )}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_62%,rgba(0,0,0,0.18)_100%)]" />
           </motion.button>
 
           <div className="min-w-0 flex-1">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <div className="mb-2 flex flex-wrap gap-2">
+          <div className="mb-3 ml-20 flex min-h-16 items-start justify-between gap-2 sm:ml-24 sm:min-h-20 md:mb-4 md:ml-0 md:min-h-0 md:gap-3">
+            <div className="min-w-0">
+              <div className="mb-1.5 hidden flex-wrap gap-2 sm:flex md:mb-2">
                 {item.releaseType && (
-                  <span className="border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-300">
+                  <span className="border border-white/15 bg-white/[0.03] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-300 md:px-2.5 md:text-[11px] md:tracking-[0.2em]">
                     {formatReleaseType(item.releaseType)}
                   </span>
                 )}
-                <span className="border border-white/10 bg-white/[0.02] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-gray-500">
+                <span className="border border-white/10 bg-white/[0.02] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-500 md:px-2.5 md:text-[11px] md:tracking-[0.2em]">
                   {item.visibility.replace("_", " ")}
                 </span>
               </div>
               <motion.button
                 type="button"
                 onClick={() => onOpen(item)}
-                className="cursor-pointer text-left text-lg leading-tight transition-colors hover:text-gray-300"
+                className="cursor-pointer text-left text-sm leading-tight transition-colors hover:text-gray-300 sm:text-base md:text-lg"
                 whileHover={SOFT_BUTTON_HOVER}
                 whileTap={SOFT_BUTTON_TAP}
               >
@@ -181,11 +183,11 @@ export function MusicReleasePlayer({
                     {subtitle}
                   </motion.button>
                 ) : (
-                  <p className="mt-1 text-sm uppercase tracking-[0.18em] text-gray-500">{subtitle}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-500 md:text-sm md:tracking-[0.18em]">{subtitle}</p>
                 )
               ) : null}
               {item.description && (
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">
+                <p className="mt-2 hidden max-w-2xl text-sm leading-relaxed text-gray-400 md:block">
                   <MentionText text={item.description} />
                 </p>
               )}
@@ -196,7 +198,7 @@ export function MusicReleasePlayer({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex h-10 w-10 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+                    className="flex h-8 w-8 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white md:h-10 md:w-10"
                     aria-label={`Open track options for ${item.title}`}
                   >
                     <Ellipsis className="h-4 w-4" />
@@ -244,13 +246,13 @@ export function MusicReleasePlayer({
             ) : null}
           </div>
 
-          <div className="grid gap-4">
-            <div className="flex items-center gap-3">
+          <div className="grid gap-2 md:gap-4">
+            <div className="flex items-center gap-2.5 md:gap-3">
               <motion.button
                 type="button"
                 onClick={() => onPlayPause(item)}
                 disabled={!item.asset?.url}
-                className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.03] text-white transition-transform hover:scale-[1.03] hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.03] text-white transition-transform hover:scale-[1.03] hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50 md:h-12 md:w-12"
                 whileHover={SOFT_BUTTON_HOVER}
                 whileTap={SOFT_BUTTON_TAP}
               >
@@ -262,12 +264,12 @@ export function MusicReleasePlayer({
               </motion.button>
 
               <div className="min-w-0 flex-1">
-                <div className="relative mb-2 overflow-hidden border border-white/10 bg-white/[0.02] px-3 py-2.5">
+                <div className="relative mb-1.5 overflow-hidden border border-white/10 bg-white/[0.02] px-2 py-1.5 md:mb-2 md:px-3 md:py-2.5">
                   <Waveform
                     data={waveformData}
                     audioUrl={item.asset?.url}
                     isPlaying={isPlaying && isActive}
-                    height={44}
+                    height={26}
                     progress={isActive ? progress : 0}
                     currentTime={isActive ? currentTime : 0}
                     duration={isActive ? duration : 0}
@@ -276,18 +278,16 @@ export function MusicReleasePlayer({
                     disabled={!isActive}
                   />
                 </div>
-                <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-gray-500">
+                <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.14em] text-gray-500 md:text-xs md:tracking-[0.16em]">
                   <span>{isActive ? formatTime(currentTime) : ""}</span>
-                  <span>{isActive ? formatTime(duration) : item.asset?.mimeType?.replace("/", " / ") || "audio"}</span>
+                  <span>{isActive ? formatTime(duration) : ""}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
                 <span>Uploaded {formatUploadDate(item.createdAt)}</span>
-                {item.asset?.fileName && <span>{item.asset.fileName}</span>}
-                {item.asset?.fileSizeBytes && <span>{formatFileSize(item.asset.fileSizeBytes)}</span>}
                 {onToggleLike ? (
                   <motion.button
                     type="button"

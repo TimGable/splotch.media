@@ -6,6 +6,7 @@ import { MusicReleasePlayer } from "./music-release-player";
 import { MultiTrackReleaseCard } from "./multi-track-release-card";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
+import { FadeInImage } from "./fade-in-image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -404,7 +405,7 @@ export function Feed({
       ) : (
       <motion.div
         key="feed-content"
-        className="mx-auto max-w-5xl space-y-6 md:space-y-8"
+        className="mx-auto max-w-5xl space-y-5 md:space-y-8"
         {...CONTENT_SWAP_ANIMATION}
         transition={PAGE_TRANSITION}
       >
@@ -424,7 +425,7 @@ export function Feed({
         const previewUrl =
           item.mediaKind === "music"
             ? item.coverAsset?.url || ""
-            : item.asset?.url || "";
+            : item.previewAsset?.url || item.asset?.url || "";
 
         return (
           <motion.article
@@ -432,9 +433,9 @@ export function Feed({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...PAGE_TRANSITION, delay: index * 0.05 }}
-            className="space-y-4"
+            className="space-y-3.5 md:space-y-4"
           >
-            <div className="flex items-center gap-4 px-1">
+            <div className="flex items-center gap-3 px-1 md:gap-4">
               <motion.button
                 type="button"
                 className="flex min-w-0 items-center gap-3 text-left"
@@ -442,12 +443,13 @@ export function Feed({
                 whileHover={SOFT_BUTTON_HOVER}
                 whileTap={SOFT_BUTTON_TAP}
               >
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/5">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/5 md:h-11 md:w-11">
                   {item.artist?.avatarUrl ? (
-                    <img
+                    <FadeInImage
                       src={item.artist.avatarUrl}
                       alt={artistLabel}
                       className="h-full w-full object-cover"
+                      containerClassName="h-full w-full"
                     />
                   ) : (
                     <span className="text-sm uppercase text-gray-400">
@@ -503,9 +505,9 @@ export function Feed({
               )
             ) : (
               <div className="overflow-hidden border border-white/20 bg-white/5 transition-colors hover:border-white/35">
-                <div className="p-4 md:p-5">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-300">
+                <div className="p-3.5 md:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3 md:mb-4">
+                    <span className="inline-flex items-center gap-1.5 border border-white/15 bg-white/[0.03] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-300 md:gap-2 md:px-2.5 md:text-[11px] md:tracking-[0.18em]">
                       {getPreviewKindIcon(item.mediaKind)}
                       <span>{item.mediaKind}</span>
                     </span>
@@ -514,7 +516,7 @@ export function Feed({
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="flex h-10 w-10 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white"
+                          className="flex h-9 w-9 items-center justify-center border border-white/15 text-gray-400 transition-colors hover:border-white/40 hover:text-white md:h-10 md:w-10"
                           aria-label={`Open post options for ${item.title}`}
                         >
                           <Ellipsis className="h-4 w-4" />
@@ -550,19 +552,19 @@ export function Feed({
                     </DropdownMenu>
                   </div>
 
-                  <div className="mb-4 flex items-start justify-between gap-4">
+                  <div className="mb-3 flex items-start justify-between gap-3 md:mb-4 md:gap-4">
                     <div className="min-w-0">
                       <motion.button
                         type="button"
                         onClick={() => onOpenItem?.(item)}
-                        className="cursor-pointer text-left text-xl transition-colors hover:text-gray-300"
+                        className="cursor-pointer text-left text-base transition-colors hover:text-gray-300 md:text-xl"
                         whileHover={SOFT_BUTTON_HOVER}
                         whileTap={SOFT_BUTTON_TAP}
                       >
                         {item.title}
                       </motion.button>
                       {item.description ? (
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">
+                        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-gray-400 md:mt-2">
                           <MentionText text={item.description} />
                         </p>
                       ) : null}
@@ -582,13 +584,13 @@ export function Feed({
                           src={item.asset.url}
                           poster={item.coverAsset?.url || ""}
                           className="w-full border border-white/10"
-                          ratioClass="aspect-[4/5] md:aspect-video"
+                          ratioClass="aspect-video"
                           useIntrinsicAspect={false}
                           muted
                           allowFullscreen
                         />
                       ) : (
-                        <div className="aspect-[4/5] w-full border border-white/10 bg-white/5 md:aspect-video" />
+                        <div className="aspect-video w-full border border-white/10 bg-white/5" />
                       )
                     ) : (
                       <motion.button
@@ -599,7 +601,7 @@ export function Feed({
                         whileTap={SOFT_BUTTON_TAP}
                       >
                         {previewUrl ? (
-                          <img
+                          <FadeInImage
                             src={previewUrl}
                             alt={item.title}
                             className="aspect-square w-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.02]"
@@ -613,11 +615,9 @@ export function Feed({
                     )}
                   </div>
 
-                  <div className="mt-4 border-t border-white/10 pt-4">
+                  <div className="mt-3 border-t border-white/10 pt-3 md:mt-4 md:pt-4">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
                       <span>Uploaded {formatUploadDate(item.createdAt)}</span>
-                      {item.asset?.fileName ? <span>{item.asset.fileName}</span> : null}
-                      {item.asset?.fileSizeBytes ? <span>{formatFileSize(item.asset.fileSizeBytes)}</span> : null}
                       <button
                         type="button"
                         onClick={() => handleToggleLike(item.id)}

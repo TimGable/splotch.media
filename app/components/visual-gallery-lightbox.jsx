@@ -7,7 +7,6 @@ import { ChevronLeft, ChevronRight, Palette, Video, X } from "lucide-react";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
 import { ViewportPortal } from "./viewport-portal";
-import { VisualImageFrame } from "./visual-image-frame";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
 
 const SWIPE_THRESHOLD = 90;
@@ -107,14 +106,14 @@ export function VisualGalleryLightbox({
       <AnimatePresence>
         {item ? (
           <motion.div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/92 px-4 py-6 backdrop-blur-md"
+            className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/92 px-3 py-4 backdrop-blur-md md:px-4 md:py-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           >
             <motion.div
-              className="relative flex max-h-full w-full max-w-7xl flex-col overflow-hidden border border-white/15 bg-black/85"
+              className="relative my-auto flex w-full max-w-7xl flex-col overflow-hidden border border-white/15 bg-black/85 md:max-h-full"
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -138,7 +137,7 @@ export function VisualGalleryLightbox({
             </div>
 
             <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="relative flex min-h-[50vh] items-center justify-center overflow-hidden bg-white/[0.02]">
+              <div className="relative flex min-h-[18rem] items-center justify-center overflow-hidden bg-white/[0.02] md:min-h-[50vh]">
                 {items.length > 1 && (
                   <>
                     <button
@@ -188,11 +187,10 @@ export function VisualGalleryLightbox({
                         allowFullscreen
                       />
                     ) : (
-                      <VisualImageFrame
+                      <img
                         src={item.asset.url}
                         alt={item.title}
-                        className="h-[78vh] w-full"
-                        imageClassName="select-none"
+                        className="max-h-[72vh] max-w-full select-none object-contain md:max-h-[78vh]"
                         draggable={false}
                       />
                     ) : (
