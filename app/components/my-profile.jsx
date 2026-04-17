@@ -1160,7 +1160,7 @@ useEffect(() => {
             >
               <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8 mb-8">
                 {/* Avatar Upload */}
-                <div className="mx-auto flex w-full max-w-[18rem] flex-col items-center md:mx-0 md:w-48 md:flex-shrink-0">
+                <div className="mx-auto flex w-full max-w-[18rem] flex-col items-center md:mx-0 md:w-auto md:max-w-none md:flex-shrink-0 md:items-start">
                   <input
                     ref={avatarInputRef}
                     type="file"
@@ -1200,17 +1200,15 @@ useEffect(() => {
                     )}
                   </button>
                   <div
-                    className={`mt-3 grid w-full items-center gap-4 ${
-                      profileData.avatar ? "grid-cols-2" : "grid-cols-1"
+                    className={`mt-3 grid w-full items-center justify-items-center gap-2 md:block md:w-auto md:text-left ${
+                      profileData.avatar ? "grid-cols-1" : "grid-cols-1"
                     }`}
                   >
                     <button
                       type="button"
                       onClick={openAvatarPicker}
                       disabled={isUploadingAvatar}
-                      className={`whitespace-nowrap text-xs uppercase tracking-[0.18em] text-gray-400 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-70 ${
-                        profileData.avatar ? "justify-self-end" : "justify-self-center"
-                      }`}
+                      className="whitespace-nowrap text-xs uppercase tracking-[0.18em] text-gray-400 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-70 md:inline"
                     >
                       {profileData.avatar ? "replace image" : "choose image"}
                     </button>
@@ -1219,7 +1217,7 @@ useEffect(() => {
                         type="button"
                         onClick={handleRemoveAvatar}
                         disabled={isUploadingAvatar}
-                        className="justify-self-start whitespace-nowrap text-xs uppercase tracking-[0.18em] text-gray-500 transition-colors hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-70"
+                        className="whitespace-nowrap text-xs uppercase tracking-[0.18em] text-gray-500 transition-colors hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-70 md:ml-4 md:inline"
                       >
                         remove
                       </button>
