@@ -1,19 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { ArchiveLoadingState } from "./archive-loading-state";
-import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
 import { usePublicAudio } from "./public-audio-context";
 import { ProfileArchiveView } from "./profile-archive-view";
-import { ProfileConnectionsModal } from "./profile-connections-modal";
 import { LikedTracksPanel } from "./liked-tracks-panel";
-import { MyProfile } from "./my-profile";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { clearPublicReturnTarget, getPublicReturnTarget } from "@/lib/public-navigation";
 import { CONTENT_SWAP_ANIMATION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, PAGE_TRANSITION } from "@/lib/motion";
+
+const VisualGalleryLightbox = dynamic(
+  () => import("./visual-gallery-lightbox").then((mod) => mod.VisualGalleryLightbox),
+  { ssr: false },
+);
+const ProfileConnectionsModal = dynamic(
+  () => import("./profile-connections-modal").then((mod) => mod.ProfileConnectionsModal),
+  { ssr: false },
+);
+const MyProfile = dynamic(() => import("./my-profile").then((mod) => mod.MyProfile), {
+  ssr: false,
+});
 
 const PROFILE_BACK_NAV_DELAY_MS = 260;
 

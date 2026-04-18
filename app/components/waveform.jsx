@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const waveformCache = new Map();
 
 async function loadWaveformPeaks(audioUrl, sampleCount) {
-  const cacheKey = `${audioUrl}::${sampleCount}`;
+  const audioIdentity = (() => {
+    try {
+      const parsed = new URL(audioUrl);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return String(audioUrl || "").split("?")[0];
+    }
+  })();
+  const cacheKey = `${audioIdentity}::${sampleCount}`;
   const cached = waveformCache.get(cacheKey);
   if (cached) {
     return cached instanceof Promise ? cached : Promise.resolve(cached);
@@ -77,6 +85,8 @@ export function Waveform({
   seekLabel,
   disabled = false,
 }) {
+  const containerRef = useRef(null);
+  const [shouldResolveWaveform, setShouldResolveWaveform] = useState(Boolean(isPlaying));
   const [resolvedData, setResolvedData] = useState(data || []);
   const bars = useMemo(() => data || [], [data]);
   const barWidth = 2;
@@ -84,6 +94,36 @@ export function Waveform({
   const activeData = resolvedData.length > 0 ? resolvedData : bars;
   const totalWidth = Math.max(activeData.length * (barWidth + gap), 1);
   const isSeekDisabled = disabled || !onSeek || !duration;
+
+  useEffect(() => {
+    if (shouldResolveWaveform || isPlaying) {
+      setShouldResolveWaveform(true);
+      return undefined;
+    }
+
+    const target = containerRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      const timer = window.setTimeout(() => setShouldResolveWaveform(true), 600);
+      return () => window.clearTimeout(timer);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setShouldResolveWaveform(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "240px 0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [isPlaying, shouldResolveWaveform]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +149,15 @@ export function Waveform({
 
     applyData(bars);
 
+    if (!shouldResolveWaveform) {
+      return () => {
+        cancelled = true;
+        if (frame) {
+          window.cancelAnimationFrame(frame);
+        }
+      };
+    }
+
     loadWaveformPeaks(audioUrl, bars.length > 0 ? bars.length : 96)
       .then((nextData) => {
         if (!cancelled) {
@@ -127,10 +176,11 @@ export function Waveform({
         window.cancelAnimationFrame(frame);
       }
     };
-  }, [audioUrl, bars]);
+  }, [audioUrl, bars, shouldResolveWaveform]);
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full overflow-hidden"
       style={{ height: `${height}px` }}
       data-playing={isPlaying ? "true" : "false"}

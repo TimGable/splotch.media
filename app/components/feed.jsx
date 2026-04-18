@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from "motion/react";
+import dynamic from "next/dynamic";
 import { Check, Copy, Ellipsis, Heart, Image as ImageIcon, MessageCircle, Share2, Video as VideoIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArchiveLoadingState } from "./archive-loading-state";
 import { MusicReleasePlayer } from "./music-release-player";
 import { MultiTrackReleaseCard } from "./multi-track-release-card";
 import { MentionText } from "./mention-text";
-import { VideoPlayer } from "./video-player";
 import { FadeInImage } from "./fade-in-image";
 import {
   DropdownMenu,
@@ -24,6 +24,13 @@ import {
   SOFT_BUTTON_TAP,
   SOFT_CARD_HOVER,
 } from "@/lib/motion";
+
+const VideoPlayer = dynamic(() => import("./video-player").then((mod) => mod.VideoPlayer), {
+  ssr: false,
+});
+
+const INITIAL_FEED_ENTRY_COUNT = 12;
+const FEED_ENTRY_PAGE_SIZE = 10;
 
 function formatRelativeTime(value) {
   if (!value) {
@@ -160,7 +167,13 @@ export function Feed({
   const [loadError, setLoadError] = useState("");
   const [likeItemId, setLikeItemId] = useState("");
   const [copiedShareUrl, setCopiedShareUrl] = useState("");
+  const [visibleEntryCount, setVisibleEntryCount] = useState(INITIAL_FEED_ENTRY_COUNT);
   const feedEntries = useMemo(() => buildFeedEntries(feedItems), [feedItems]);
+  const visibleFeedEntries = useMemo(
+    () => feedEntries.slice(0, visibleEntryCount),
+    [feedEntries, visibleEntryCount],
+  );
+  const hasMoreFeedEntries = visibleEntryCount < feedEntries.length;
 
   const formatFileSize = (bytes) => {
     if (!bytes) return "";
@@ -243,6 +256,7 @@ export function Feed({
         }
 
         setFeedItems(Array.isArray(payload?.items) ? payload.items : []);
+        setVisibleEntryCount(INITIAL_FEED_ENTRY_COUNT);
         setFeedSource(payload?.source === "discovery" ? "discovery" : "following");
         setLoadingProgress(100);
 
@@ -418,7 +432,7 @@ export function Feed({
         </div>
       ) : null}
 
-      {feedEntries.map((entry, index) => {
+      {visibleFeedEntries.map((entry, index) => {
         const item = entry.kind === "release" ? entry.release.tracks[0] : entry.item;
         const artistLabel = getArtistLabel(item.artist);
         const isActiveTrack = item.mediaKind === "music" && currentTrackId === item.id;
@@ -646,6 +660,23 @@ export function Feed({
           </motion.article>
         );
       })}
+      {hasMoreFeedEntries ? (
+        <div className="flex justify-center pt-2">
+          <motion.button
+            type="button"
+            onClick={() =>
+              setVisibleEntryCount((count) =>
+                Math.min(feedEntries.length, count + FEED_ENTRY_PAGE_SIZE),
+              )
+            }
+            className="border border-white/20 px-5 py-3 text-sm tracking-wide text-gray-300 transition-colors hover:border-white/50 hover:bg-white/5 hover:text-white"
+            whileHover={SOFT_BUTTON_HOVER}
+            whileTap={SOFT_BUTTON_TAP}
+          >
+            load more
+          </motion.button>
+        </div>
+      ) : null}
       </motion.div>
       )}
     </AnimatePresence>

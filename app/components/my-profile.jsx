@@ -1,23 +1,52 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
 import { Upload, Edit2, Music, Palette, Video, Check, Trash2 } from "lucide-react";
-import { ChangePasswordModal } from "./change-password-modal";
 import { ArchiveLoadingState } from "./archive-loading-state";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { UploadContentModal } from "./upload-content-modal";
-import { UploadProgressModal } from "./upload-progress-modal";
-import { EditUploadModal } from "./edit-upload-modal";
-import { ImageCropModal } from "./image-crop-modal";
-import { UploadCategoryModal } from "./upload-category-modal";
-import { MediaItemPage } from "./media-item-page";
-import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
 import { ProfileArchiveView } from "./profile-archive-view";
-import { ProfileConnectionsModal } from "./profile-connections-modal";
 import { LikedTracksPanel } from "./liked-tracks-panel";
 import { attachPublicMediaSlugs, buildPublicMediaPath } from "@/lib/media-slugs";
 import { CONTENT_SWAP_ANIMATION, PAGE_TRANSITION, PROFILE_PANEL_SWAP_ANIMATION } from "@/lib/motion";
 import { uploadMediaDirectToSupabase } from "@/lib/upload-request";
+
+const ChangePasswordModal = dynamic(
+  () => import("./change-password-modal").then((mod) => mod.ChangePasswordModal),
+  { ssr: false },
+);
+const UploadContentModal = dynamic(
+  () => import("./upload-content-modal").then((mod) => mod.UploadContentModal),
+  { ssr: false },
+);
+const UploadProgressModal = dynamic(
+  () => import("./upload-progress-modal").then((mod) => mod.UploadProgressModal),
+  { ssr: false },
+);
+const EditUploadModal = dynamic(
+  () => import("./edit-upload-modal").then((mod) => mod.EditUploadModal),
+  { ssr: false },
+);
+const ImageCropModal = dynamic(
+  () => import("./image-crop-modal").then((mod) => mod.ImageCropModal),
+  { ssr: false },
+);
+const UploadCategoryModal = dynamic(
+  () => import("./upload-category-modal").then((mod) => mod.UploadCategoryModal),
+  { ssr: false },
+);
+const MediaItemPage = dynamic(
+  () => import("./media-item-page").then((mod) => mod.MediaItemPage),
+  { ssr: false },
+);
+const VisualGalleryLightbox = dynamic(
+  () => import("./visual-gallery-lightbox").then((mod) => mod.VisualGalleryLightbox),
+  { ssr: false },
+);
+const ProfileConnectionsModal = dynamic(
+  () => import("./profile-connections-modal").then((mod) => mod.ProfileConnectionsModal),
+  { ssr: false },
+);
 
 const PROFILE_DETAIL_HISTORY_KEY = "__omaProfileDetail";
 
@@ -103,9 +132,18 @@ export function MyProfile({
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const isEditMode = forceSetup || isEditing;
   const mediaItemsWithSlugs = useMemo(() => attachPublicMediaSlugs(mediaItems), [mediaItems]);
-const musicItems = mediaItemsWithSlugs.filter((item) => item.mediaKind === "music");
-const visualItems = mediaItemsWithSlugs.filter((item) => item.mediaKind === "visual");
-const videoItems = mediaItemsWithSlugs.filter((item) => item.mediaKind === "video");
+const musicItems = useMemo(
+  () => mediaItemsWithSlugs.filter((item) => item.mediaKind === "music"),
+  [mediaItemsWithSlugs],
+);
+const visualItems = useMemo(
+  () => mediaItemsWithSlugs.filter((item) => item.mediaKind === "visual"),
+  [mediaItemsWithSlugs],
+);
+const videoItems = useMemo(
+  () => mediaItemsWithSlugs.filter((item) => item.mediaKind === "video"),
+  [mediaItemsWithSlugs],
+);
 const lightboxItems = lightboxState.kind === "video" ? videoItems : visualItems;
 useEffect(() => {
   if (

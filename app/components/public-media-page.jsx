@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import { Edit2, ListPlus, Music2, Pause, Play, Palette, Video } from "lucide-react";
@@ -8,14 +9,23 @@ import { useRouter } from "next/navigation";
 import { Waveform } from "./waveform";
 import { usePublicAudio } from "./public-audio-context";
 import { MediaSocialPanel } from "./media-social-panel";
-import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
-import { EditUploadModal } from "./edit-upload-modal";
 import { MentionText } from "./mention-text";
-import { VideoPlayer } from "./video-player";
 import { ShareLinkButton } from "./share-link-button";
 import { FadeInImage } from "./fade-in-image";
 import { buildPublicMediaPath, buildPublicProfilePath } from "@/lib/media-slugs";
 import { createSupabaseBrowserClient, getStoredSupabaseUserId } from "@/lib/supabase/client";
+
+const VisualGalleryLightbox = dynamic(
+  () => import("./visual-gallery-lightbox").then((mod) => mod.VisualGalleryLightbox),
+  { ssr: false },
+);
+const EditUploadModal = dynamic(
+  () => import("./edit-upload-modal").then((mod) => mod.EditUploadModal),
+  { ssr: false },
+);
+const VideoPlayer = dynamic(() => import("./video-player").then((mod) => mod.VideoPlayer), {
+  ssr: false,
+});
 
 function hashString(value) {
   let hash = 0;

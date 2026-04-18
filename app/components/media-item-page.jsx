@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import { Edit2, ListPlus, Music2, Palette, Pause, Play, Video } from "lucide-react";
 import { Waveform } from "./waveform";
 import { MediaSocialPanel } from "./media-social-panel";
-import { VisualGalleryLightbox } from "./visual-gallery-lightbox";
-import { VideoPlayer } from "./video-player";
 import { MentionText } from "./mention-text";
 import { ShareLinkButton } from "./share-link-button";
 import { FadeInImage } from "./fade-in-image";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
+
+const VisualGalleryLightbox = dynamic(
+  () => import("./visual-gallery-lightbox").then((mod) => mod.VisualGalleryLightbox),
+  { ssr: false },
+);
+const VideoPlayer = dynamic(() => import("./video-player").then((mod) => mod.VideoPlayer), {
+  ssr: false,
+});
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) {

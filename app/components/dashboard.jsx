@@ -1,16 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { BrowseArtists } from "./browse-artists";
-import { MyProfile } from "./my-profile";
-import { BrowseVisualArtists } from "./browse-visual-artists";
-import { BrowseVideoArtists } from "./browse-video-artists";
-import { CategorySelector } from "./category-selector";
-import { Feed } from "./feed";
 import { InteractiveBackground } from "./interactive-background";
-import { AdminPanel } from "./admin-panel";
-import { CommunityAnnouncementsBoard } from "./community-announcements-board";
-import { GlobalUploadFlow } from "./global-upload-flow";
 import { usePublicAudio } from "./public-audio-context";
 import { SiteNavigation } from "./site-navigation";
 import { ViewportPortal } from "./viewport-portal";
@@ -27,6 +19,31 @@ import {
   SOFT_BUTTON_HOVER,
   SOFT_BUTTON_TAP,
 } from "@/lib/motion";
+
+const BrowseArtists = dynamic(() => import("./browse-artists").then((mod) => mod.BrowseArtists));
+const MyProfile = dynamic(() => import("./my-profile").then((mod) => mod.MyProfile), {
+  ssr: false,
+});
+const BrowseVisualArtists = dynamic(() =>
+  import("./browse-visual-artists").then((mod) => mod.BrowseVisualArtists),
+);
+const BrowseVideoArtists = dynamic(() =>
+  import("./browse-video-artists").then((mod) => mod.BrowseVideoArtists),
+);
+const CategorySelector = dynamic(() =>
+  import("./category-selector").then((mod) => mod.CategorySelector),
+);
+const Feed = dynamic(() => import("./feed").then((mod) => mod.Feed), { ssr: false });
+const AdminPanel = dynamic(() => import("./admin-panel").then((mod) => mod.AdminPanel), {
+  ssr: false,
+});
+const CommunityAnnouncementsBoard = dynamic(() =>
+  import("./community-announcements-board").then((mod) => mod.CommunityAnnouncementsBoard),
+);
+const GlobalUploadFlow = dynamic(
+  () => import("./global-upload-flow").then((mod) => mod.GlobalUploadFlow),
+  { ssr: false },
+);
 
 function isGeneratedUsername(username) {
   return typeof username === "string" && /_[a-f0-9]{8}$/.test(username);
