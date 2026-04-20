@@ -64,6 +64,7 @@ export function MultiTrackReleaseCard({
   onPlayTrack,
   onAddTrackToQueue,
   onToggleLike,
+  isLikePending = false,
   onOpenComments,
   onEditRelease,
   onShare,
@@ -277,9 +278,10 @@ export function MultiTrackReleaseCard({
                 <motion.button
                   type="button"
                   onClick={() => onToggleLike(firstTrack)}
+                  disabled={isLikePending}
                   className={`inline-flex items-center gap-1.5 transition-colors ${
                     isReleaseLiked ? "text-white" : "hover:text-white"
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
                   whileHover={SOFT_BUTTON_HOVER}
                   whileTap={SOFT_BUTTON_TAP}
                 >

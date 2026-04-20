@@ -9,6 +9,7 @@ import { getSupabaseStorageBucket } from "@/lib/supabase/config";
 import { ensureStorageBucketExists } from "@/lib/supabase/storage";
 import { getMediaSocialSummary } from "@/lib/media-social";
 import { createMentionNotifications } from "@/lib/mentions";
+import { createAppNotification } from "@/lib/notifications/app-notifications";
 
 const MEDIA_KINDS = new Set(["music", "visual", "video"]);
 const MUSIC_RELEASE_TYPES = new Set(["single", "ep", "album"]);
@@ -1015,6 +1016,25 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: updatedItemError.message }, { status: 500 });
     }
 
+    if (isAdmin && existingItem.owner_user_id !== userId) {
+      try {
+        await createAppNotification({
+          recipientUserId: existingItem.owner_user_id,
+          actorUserId: userId,
+          type: "mention",
+          mediaItemId,
+          data: {
+            source: "moderation",
+            action: "updated",
+            title,
+            bodyPreview: `moderation updated your post "${title}".`,
+          },
+        });
+      } catch (notificationError) {
+        console.error("Failed to create moderation update notification:", notificationError);
+      }
+    }
+
     try {
       if (description) {
         await createMentionNotifications({
@@ -1060,7 +1080,7 @@ export async function DELETE(request: Request) {
     const supabase = createSupabaseServiceRoleClient();
     const { data: mediaItem, error: mediaItemError } = await supabase
       .from("media_items")
-      .select("id, owner_user_id, collection_id, music_release_type")
+      .select("id, owner_user_id, collection_id, music_release_type, title")
       .eq("id", mediaItemId)
       .maybeSingle();
 
@@ -1086,7 +1106,7 @@ export async function DELETE(request: Request) {
     if (shouldDeleteRelease) {
       const { data: releaseItems, error: releaseItemsError } = await supabase
         .from("media_items")
-        .select("id, owner_user_id, collection_id, music_release_type")
+        .select("id, owner_user_id, collection_id, music_release_type, title")
         .eq("collection_id", mediaItem.collection_id);
 
       if (releaseItemsError) {
@@ -1136,6 +1156,29 @@ export async function DELETE(request: Request) {
 
     if (shouldDeleteRelease && mediaItem.collection_id) {
       await supabase.from("media_collections").delete().eq("id", mediaItem.collection_id);
+    }
+
+    if (isAdmin && mediaItem.owner_user_id !== userId) {
+      try {
+        const deletedTitle =
+          shouldDeleteRelease && mediaItemsToDelete.length > 1
+            ? mediaItem.title || "your release"
+            : mediaItem.title || "your post";
+        await createAppNotification({
+          recipientUserId: mediaItem.owner_user_id,
+          actorUserId: userId,
+          type: "mention",
+          mediaItemId: null,
+          data: {
+            source: "moderation",
+            action: "deleted",
+            title: deletedTitle,
+            bodyPreview: `moderation deleted your post "${deletedTitle}".`,
+          },
+        });
+      } catch (notificationError) {
+        console.error("Failed to create moderation delete notification:", notificationError);
+      }
     }
 
     return NextResponse.json({

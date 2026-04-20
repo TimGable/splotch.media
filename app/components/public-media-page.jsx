@@ -298,7 +298,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
         return;
       }
 
-      const nextIsOwnerView = payload?.profile?.userId === profile.userId;
+      const nextIsOwnerView = payload?.profile?.userId === profile.userId || Boolean(payload?.profile?.isAdmin);
       setIsOwnerView((current) => (current === nextIsOwnerView ? current : nextIsOwnerView));
     };
 
@@ -327,7 +327,7 @@ export function PublicMediaPage({ profile, item, publicItems }) {
             return;
           }
 
-          const nextIsOwnerView = payload?.profile?.userId === profile.userId;
+          const nextIsOwnerView = payload?.profile?.userId === profile.userId || Boolean(payload?.profile?.isAdmin);
           setIsOwnerView((current) => (current === nextIsOwnerView ? current : nextIsOwnerView));
         })
         .catch(() => {

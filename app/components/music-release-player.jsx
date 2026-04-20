@@ -247,12 +247,12 @@ export function MusicReleasePlayer({
           </div>
 
           <div className="grid gap-2 md:gap-4">
-            <div className="flex items-center gap-2.5 md:gap-3">
+            <div className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-2.5 md:grid-cols-[3rem_minmax(0,1fr)] md:gap-3">
               <motion.button
                 type="button"
                 onClick={() => onPlayPause(item)}
                 disabled={!item.asset?.url}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.03] text-white transition-transform hover:scale-[1.03] hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50 md:h-12 md:w-12"
+                className="mt-[3px] flex h-8 w-8 flex-shrink-0 items-center justify-center self-start rounded-full border border-white/20 bg-white/[0.03] text-white transition-transform hover:scale-[1.03] hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50 md:mt-0 md:h-12 md:w-12"
                 whileHover={SOFT_BUTTON_HOVER}
                 whileTap={SOFT_BUTTON_TAP}
               >

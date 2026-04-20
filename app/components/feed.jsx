@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Copy, Ellipsis, Heart, Image as ImageIcon, MessageCircle, Share2, Video as VideoIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArchiveLoadingState } from "./archive-loading-state";
 import { MusicReleasePlayer } from "./music-release-player";
 import { MultiTrackReleaseCard } from "./multi-track-release-card";
@@ -24,6 +24,8 @@ import {
   SOFT_BUTTON_TAP,
   SOFT_CARD_HOVER,
 } from "@/lib/motion";
+
+const FEED_PAGE_SIZE = 5;
 
 function formatRelativeTime(value) {
   if (!value) {
@@ -106,6 +108,7 @@ function buildReleaseSummary(group) {
     tracks,
     likes: tracks.reduce((total, track) => total + (track.likes || 0), 0),
     comments: tracks.reduce((total, track) => total + (track.comments || 0), 0),
+    isLiked: tracks.some((track) => Boolean(track.isLiked)),
   };
 }
 
@@ -153,13 +156,20 @@ export function Feed({
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const copiedShareTimeoutRef = useRef(null);
+  const feedLoadRequestRef = useRef(0);
+  const loadMoreTriggerRef = useRef(null);
+  const hasMoreFeedItemsRef = useRef(false);
+  const isLoadingMoreRef = useRef(false);
+  const nextFeedOffsetRef = useRef(0);
   const [feedItems, setFeedItems] = useState([]);
   const [feedSource, setFeedSource] = useState("following");
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(12);
   const [loadError, setLoadError] = useState("");
   const [likeItemId, setLikeItemId] = useState("");
   const [copiedShareUrl, setCopiedShareUrl] = useState("");
+  const [hasMoreFeedItems, setHasMoreFeedItems] = useState(false);
   const feedEntries = useMemo(() => buildFeedEntries(feedItems), [feedItems]);
 
   const formatFileSize = (bytes) => {
@@ -189,13 +199,27 @@ export function Feed({
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadFeed() {
+  const loadFeed = useCallback(
+    async ({ reset = false } = {}) => {
       const startedAt = Date.now();
-      setIsLoading(true);
-      setLoadingProgress(12);
+      const offset = reset ? 0 : nextFeedOffsetRef.current;
+
+      if (reset) {
+        setIsLoading(true);
+        setLoadingProgress(12);
+        hasMoreFeedItemsRef.current = false;
+        nextFeedOffsetRef.current = 0;
+        setHasMoreFeedItems(false);
+      } else {
+        if (isLoadingMoreRef.current || !hasMoreFeedItemsRef.current) {
+          return;
+        }
+        isLoadingMoreRef.current = true;
+        setIsLoadingMore(true);
+      }
+
+      const requestId = feedLoadRequestRef.current + 1;
+      feedLoadRequestRef.current = requestId;
       setLoadError("");
 
       try {
@@ -203,85 +227,154 @@ export function Feed({
           data: { session },
         } = await supabase.auth.getSession();
 
-        if (!mounted) {
+        if (feedLoadRequestRef.current !== requestId) {
           return;
         }
 
         if (!session?.access_token) {
-          setFeedItems([]);
+          if (reset) {
+            setFeedItems([]);
+          }
           setLoadError("Session expired. Please sign in again.");
           setLoadingProgress(100);
           setIsLoading(false);
+          isLoadingMoreRef.current = false;
+          setIsLoadingMore(false);
           return;
         }
 
-        setLoadingProgress(28);
+        if (reset) {
+          setLoadingProgress(28);
+        }
 
-        const response = await fetch("/api/feed", {
+        const response = await fetch(`/api/feed?limit=${FEED_PAGE_SIZE}&offset=${offset}`, {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           },
         });
 
-        if (!mounted) {
+        if (feedLoadRequestRef.current !== requestId) {
           return;
         }
 
-        setLoadingProgress(72);
+        if (reset) {
+          setLoadingProgress(72);
+        }
 
         const payload = await response.json().catch(() => ({}));
-        if (!mounted) {
+        if (feedLoadRequestRef.current !== requestId) {
           return;
         }
 
         if (!response.ok) {
-          setFeedItems([]);
+          if (reset) {
+            setFeedItems([]);
+          }
           setLoadError(payload?.error || "Failed to load your feed.");
           setLoadingProgress(100);
           setIsLoading(false);
+          isLoadingMoreRef.current = false;
+          setIsLoadingMore(false);
           return;
         }
 
-        setFeedItems(Array.isArray(payload?.items) ? payload.items : []);
+        const nextItems = Array.isArray(payload?.items) ? payload.items : [];
+        setFeedItems((currentItems) => {
+          if (reset) {
+            return nextItems;
+          }
+
+          const existingIds = new Set(currentItems.map((item) => item.id));
+          return [...currentItems, ...nextItems.filter((item) => !existingIds.has(item.id))];
+        });
         setFeedSource(payload?.source === "discovery" ? "discovery" : "following");
-        setLoadingProgress(100);
+        hasMoreFeedItemsRef.current = Boolean(payload?.hasMore);
+        nextFeedOffsetRef.current = Number.isFinite(payload?.nextOffset)
+          ? payload.nextOffset
+          : offset + nextItems.length;
+        setHasMoreFeedItems(Boolean(payload?.hasMore));
+
+        if (reset) {
+          setLoadingProgress(100);
+        }
 
         const elapsed = Date.now() - startedAt;
-        const minLoadDuration = 520;
+        const minLoadDuration = reset ? 520 : 420;
         if (elapsed < minLoadDuration) {
           await new Promise((resolve) => setTimeout(resolve, minLoadDuration - elapsed));
         }
 
-        if (!mounted) {
+        if (feedLoadRequestRef.current !== requestId) {
           return;
         }
 
-        setIsLoading(false);
+        if (reset) {
+          setIsLoading(false);
+        } else {
+          isLoadingMoreRef.current = false;
+          setIsLoadingMore(false);
+        }
       } catch (error) {
-        if (!mounted) {
+        if (feedLoadRequestRef.current !== requestId) {
           return;
         }
 
-        setFeedItems([]);
+        if (reset) {
+          setFeedItems([]);
+        }
         setLoadError(error instanceof Error ? error.message : "Failed to load your feed.");
         setLoadingProgress(100);
         setIsLoading(false);
+        isLoadingMoreRef.current = false;
+        setIsLoadingMore(false);
       }
-    }
+    },
+    [supabase],
+  );
 
-    loadFeed();
+  useEffect(() => {
+    let mounted = true;
+
+    const loadInitialFeed = () => {
+      if (!mounted) {
+        return;
+      }
+      loadFeed({ reset: true });
+    };
+
+    loadInitialFeed();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      loadFeed();
+      loadInitialFeed();
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [loadFeed, supabase]);
+
+  useEffect(() => {
+    const trigger = loadMoreTriggerRef.current;
+    if (!trigger || isLoading || !hasMoreFeedItems) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadFeed();
+        }
+      },
+      { rootMargin: "360px 0px" },
+    );
+
+    observer.observe(trigger);
+
+    return () => observer.disconnect();
+  }, [hasMoreFeedItems, isLoading, loadFeed]);
 
   const getShareUrl = (item) => {
     if (typeof window === "undefined") {
@@ -477,6 +570,8 @@ export function Feed({
                   onOpen={(track) => onOpenItem?.(track)}
                   onPlayTrack={(track, releaseTracks) => onPlayTrack?.(track, releaseTracks || feedItems)}
                   onAddTrackToQueue={(track) => onAddToQueue?.(track, feedItems)}
+                  onToggleLike={(track) => handleToggleLike(track.id)}
+                  isLikePending={entry.release.tracks.some((track) => likeItemId === track.id)}
                   onShare={getShareUrl}
                   onOpenComments={(track) => onOpenItem?.(track)}
                   formatFileSize={formatFileSize}
@@ -646,6 +741,26 @@ export function Feed({
           </motion.article>
         );
       })}
+      <div ref={loadMoreTriggerRef} className="h-10" aria-hidden="true" />
+      <AnimatePresence initial={false}>
+        {isLoadingMore ? (
+          <motion.div
+            key="feed-load-more"
+            className="flex justify-center pb-2 pt-1"
+            initial={{ opacity: 0, y: 10, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.94 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div
+              className="h-7 w-7 rounded-full border border-white/15 border-t-white/80"
+              style={{ animation: "archive-feed-spin 820ms linear infinite" }}
+              aria-label="loading more posts"
+              role="status"
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       </motion.div>
       )}
     </AnimatePresence>

@@ -137,6 +137,46 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
   useEffect(() => {
     let mounted = true;
 
+    async function refreshViewerSocialState(accessToken) {
+      const mediaItemIds = [...new Set((items || []).map((item) => item.id).filter(Boolean))];
+      if (mediaItemIds.length === 0) {
+        return;
+      }
+
+      const response = await fetch(`/api/media/social?ids=${encodeURIComponent(mediaItemIds.join(","))}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok || !mounted) {
+        return;
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      const socialByItemId = payload?.items && typeof payload.items === "object" ? payload.items : {};
+
+      if (!mounted) {
+        return;
+      }
+
+      setMediaItems((currentItems) =>
+        currentItems.map((item) => {
+          const social = socialByItemId[item.id];
+          if (!social) {
+            return item;
+          }
+
+          return {
+            ...item,
+            likes: Number(social.likes ?? item.likes),
+            comments: Number(social.comments ?? item.comments),
+            isLiked: Boolean(social.isLiked),
+          };
+        }),
+      );
+    }
+
     async function loadFollowState() {
       setIsResolvingViewer(true);
 
@@ -177,6 +217,8 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
         setIsOwnProfile(isOwnProfile);
         setCanFollow(!isOwnProfile);
 
+        await refreshViewerSocialState(session.access_token);
+
         if (isOwnProfile) {
           return;
         }
@@ -210,7 +252,7 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
     return () => {
       mounted = false;
     };
-  }, [profile.userId, supabase]);
+  }, [items, profile.userId, supabase]);
 
   const handleModeratorToggle = async () => {
     if (isUpdatingModerator) {

@@ -11,6 +11,10 @@ import { MentionText } from "./mention-text";
 import { ViewportPortal } from "./viewport-portal";
 
 function getNotificationIcon(type) {
+  if (type === "mention") {
+    return <AtSign className="h-4 w-4" />;
+  }
+
   if (type === "follow") {
     return <UserPlus className="h-4 w-4" />;
   }
@@ -19,15 +23,20 @@ function getNotificationIcon(type) {
     return <MessageCircle className="h-4 w-4" />;
   }
 
-  if (type === "mention") {
-    return <AtSign className="h-4 w-4" />;
-  }
-
   return <Heart className="h-4 w-4" />;
 }
 
 function getNotificationText(notification) {
   const actorName = notification.actor?.displayName || notification.actor?.username || "someone";
+
+  if (notification.data?.source === "moderation") {
+    const title = notification.data?.title || notification.media?.title || "your post";
+    if (notification.data?.action === "deleted") {
+      return `${actorName} deleted ${title} by moderation`;
+    }
+
+    return `${actorName} updated ${title} by moderation`;
+  }
 
   if (notification.type === "follow") {
     return `${actorName} followed you`;

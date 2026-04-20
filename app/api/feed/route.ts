@@ -5,8 +5,8 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const IMAGE_PREVIEW_WIDTH = 900;
-const MAX_FEED_ITEMS = 50;
-const DISCOVERY_SAMPLE_SIZE = 160;
+const DEFAULT_FEED_LIMIT = 5;
+const MAX_FEED_LIMIT = 10;
 
 type FeedMediaItemRow = {
   id: string;
@@ -31,17 +31,6 @@ type FeedSlugRow = {
   music_release_type: string | null;
   title: string;
 };
-
-function shuffleItems(items: FeedMediaItemRow[]) {
-  const nextItems = [...items];
-
-  for (let index = nextItems.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [nextItems[index], nextItems[swapIndex]] = [nextItems[swapIndex], nextItems[index]];
-  }
-
-  return nextItems;
-}
 
 async function createSignedAssetPayload(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
@@ -79,6 +68,14 @@ async function createSignedAssetPayload(
 
 export async function GET(request: Request) {
   try {
+    const requestUrl = new URL(request.url);
+    const requestedLimit = Number.parseInt(requestUrl.searchParams.get("limit") || "", 10);
+    const requestedOffset = Number.parseInt(requestUrl.searchParams.get("offset") || "", 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), MAX_FEED_LIMIT)
+      : DEFAULT_FEED_LIMIT;
+    const offset = Number.isFinite(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+
     const auth = await getAuthContext(request);
     if (!auth) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
@@ -111,10 +108,11 @@ export async function GET(request: Request) {
       .order("published_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 
+    const pageEnd = offset + limit;
     const mediaPromise =
       followedArtistIds.length > 0
-        ? mediaItemsQuery.in("owner_user_id", followedArtistIds).limit(MAX_FEED_ITEMS)
-        : mediaItemsQuery.neq("owner_user_id", userId).limit(DISCOVERY_SAMPLE_SIZE);
+        ? mediaItemsQuery.in("owner_user_id", followedArtistIds).range(offset, pageEnd)
+        : mediaItemsQuery.neq("owner_user_id", userId).range(offset, pageEnd);
 
     const { data: rawMediaItems, error: mediaItemsError } = await mediaPromise;
 
@@ -122,10 +120,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: mediaItemsError.message }, { status: 500 });
     }
 
-    const mediaItems =
-      followedArtistIds.length > 0
-        ? rawMediaItems ?? []
-        : shuffleItems(rawMediaItems ?? []).slice(0, MAX_FEED_ITEMS);
+    const fetchedMediaItems = rawMediaItems ?? [];
+    const hasMore = fetchedMediaItems.length > limit;
+    const mediaItems = fetchedMediaItems.slice(0, limit);
     const ownerIds = [...new Set(mediaItems.map((item) => item.owner_user_id).filter(Boolean))];
 
     const { data: profiles, error: profilesError } = await supabase
@@ -364,7 +361,12 @@ export async function GET(request: Request) {
       ];
     });
 
-    return NextResponse.json({ items, source: feedSource });
+    return NextResponse.json({
+      items,
+      source: feedSource,
+      hasMore,
+      nextOffset: offset + mediaItems.length,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error.";
     return NextResponse.json({ error: message }, { status: 500 });

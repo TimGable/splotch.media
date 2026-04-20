@@ -19,7 +19,7 @@ function mapReleaseTracks(tracks) {
 
   return tracks.map((track, index) => ({
     id: track.id,
-    title: track.title || `Track ${index + 1}`,
+    title: track.title || `track ${index + 1}`,
     fileName: track.asset?.fileName || "",
     trackNumber: track.trackNumber ?? index + 1,
   }));
@@ -86,7 +86,7 @@ export function EditUploadModal({
     setError("");
 
     if (!title.trim()) {
-      setError("A title is required.");
+      setError("a title is required.");
       return;
     }
 
@@ -103,7 +103,7 @@ export function EditUploadModal({
 
   const handleRemoveTrack = async (track) => {
     if (!onDeleteTrack || trackedReleaseTracks.length <= 1) {
-      setError("Keep at least one track in the release.");
+      setError("keep at least one track in the release.");
       return;
     }
 
@@ -112,14 +112,14 @@ export function EditUploadModal({
     try {
       const success = await onDeleteTrack(track.id);
       if (!success) {
-        setError("Failed to delete track. Please try again.");
+        setError("failed to delete track. please try again.");
         return;
       }
         setTrackedReleaseTracks((current) => current.filter((entry) => entry.id !== track.id));
         setConfirmingTrackId("");
     } catch (deleteError) {
       setError(
-        deleteError instanceof Error ? deleteError.message : "Failed to delete track. Please try again.",
+        deleteError instanceof Error ? deleteError.message : "failed to delete track. please try again.",
       );
     } finally {
       setRemovingTrackId("");
@@ -149,7 +149,7 @@ export function EditUploadModal({
           <div>
             <h3 className="text-2xl">edit upload</h3>
             <p className="mt-2 text-sm text-gray-400">
-              Update the title, description, and availability for this upload.
+              update the title, description, and availability for this upload.
             </p>
           </div>
           <motion.button
@@ -257,7 +257,7 @@ export function EditUploadModal({
                     </motion.button>
                     {confirmingTrackId === track.id ? (
                       <div className="col-span-full rounded border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-200">
-                        <p>Confirm deletion. This removes the track immediately and cannot be undone.</p>
+                        <p>confirm deletion. this removes the track immediately and cannot be undone.</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <motion.button
                             type="button"
@@ -301,7 +301,7 @@ export function EditUploadModal({
                     {coverArt ? coverArt.name : item?.coverAsset?.fileName || "choose new cover art"}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    Replace the current cover image with JPG, PNG, WEBP, GIF, or AVIF.
+                    replace the current cover image with jpg, png, webp, gif, or avif.
                   </p>
                 </div>
                 <input
@@ -320,7 +320,7 @@ export function EditUploadModal({
                   </div>
                   <img
                     src={coverArtPreviewUrl || item.coverAsset.url}
-                    alt="Cover art preview"
+                    alt="cover art preview"
                     className="aspect-square w-full max-w-[12rem] object-cover"
                   />
                 </div>
@@ -338,16 +338,16 @@ export function EditUploadModal({
             <div className="mb-3 flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 text-red-300" />
               <div>
-                <p className="text-sm text-red-200">Delete this upload</p>
+                <p className="text-sm text-red-200">delete this upload</p>
                 <p className="mt-1 text-xs text-gray-400">
-                  This permanently removes the file and its metadata from your archive.
+                  this permanently removes the file and its metadata from your archive.
                 </p>
               </div>
             </div>
             {isConfirmingDelete ? (
               <div className="space-y-3">
                 <p className="text-xs text-red-200">
-                  Confirm deletion. This action cannot be undone.
+                  confirm deletion. this action cannot be undone.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <motion.button
@@ -414,7 +414,7 @@ export function EditUploadModal({
         <ImageCropModal
           file={coverArtDraft}
           title="crop album art"
-          description="Adjust the frame before saving so the cover lands cleanly across profile cards, the player, and public pages."
+          description="adjust the frame before saving so the cover lands cleanly across profile cards, the player, and public pages."
           confirmLabel="use cover art"
           outputSize={1400}
           onClose={() => setCoverArtDraft(null)}

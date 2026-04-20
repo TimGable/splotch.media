@@ -1,46 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, ChevronRight, Palette, Video, X } from "lucide-react";
+import { Palette, Video, X } from "lucide-react";
 import { MentionText } from "./mention-text";
 import { VideoPlayer } from "./video-player";
 import { ViewportPortal } from "./viewport-portal";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
-
-const SWIPE_THRESHOLD = 90;
-
-const mediaSlideVariants = {
-  enter: (direction) => ({
-    x: direction > 0 ? 72 : -72,
-    opacity: 0,
-    scale: 0.985,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-    scale: 1,
-  },
-  exit: (direction) => ({
-    x: direction > 0 ? -72 : 72,
-    opacity: 0,
-    scale: 0.985,
-  }),
-};
 
 export function VisualGalleryLightbox({
   profile,
   items,
   currentIndex,
   onClose,
-  onPrevious,
-  onNext,
 }) {
   const item = currentIndex >= 0 ? items[currentIndex] : null;
   const kindLabel = item?.mediaKind === "video" ? "video" : "visual art";
-  const previousIndexRef = useRef(currentIndex);
-  const [direction, setDirection] = useState(0);
 
   useEffect(() => {
     if (!item) {
@@ -50,56 +26,12 @@ export function VisualGalleryLightbox({
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         onClose();
-        return;
-      }
-
-      if (event.key === "ArrowLeft") {
-        onPrevious();
-        return;
-      }
-
-      if (event.key === "ArrowRight") {
-        onNext();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [item, onClose, onNext, onPrevious]);
-
-  useEffect(() => {
-    if (currentIndex < 0) {
-      previousIndexRef.current = currentIndex;
-      // Direction is derived from the parent-controlled gallery index.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDirection(0);
-      return;
-    }
-
-    if (previousIndexRef.current === currentIndex) {
-      return;
-    }
-
-    setDirection(currentIndex > previousIndexRef.current ? 1 : -1);
-    previousIndexRef.current = currentIndex;
-  }, [currentIndex]);
-
-  const handleDragEnd = (_, info) => {
-    if (items.length <= 1) {
-      return;
-    }
-
-    if (info.offset.x <= -SWIPE_THRESHOLD) {
-      setDirection(1);
-      onNext();
-      return;
-    }
-
-    if (info.offset.x >= SWIPE_THRESHOLD) {
-      setDirection(-1);
-      onPrevious();
-    }
-  };
+  }, [item, onClose]);
 
   return (
     <ViewportPortal>
@@ -138,46 +70,17 @@ export function VisualGalleryLightbox({
 
             <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="relative flex min-h-[18rem] items-center justify-center overflow-hidden bg-white/[0.02] md:min-h-[50vh]">
-                {items.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={onPrevious}
-                      className="absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center border border-white/15 bg-black/55 text-gray-300 transition-colors hover:border-white/40 hover:text-white"
-                      aria-label={item.mediaKind === "video" ? "Previous video" : "Previous artwork"}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={onNext}
-                      className="absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center border border-white/15 bg-black/55 text-gray-300 transition-colors hover:border-white/40 hover:text-white"
-                      aria-label={item.mediaKind === "video" ? "Next video" : "Next artwork"}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </>
-                )}
-
-                <AnimatePresence initial={false} custom={direction} mode="popLayout">
+                <AnimatePresence initial={false} mode="popLayout">
                   <motion.div
                     key={item.id}
-                    custom={direction}
-                    variants={mediaSlideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
+                    initial={{ opacity: 0, scale: 0.985 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.985 }}
                     transition={{
-                      x: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
                       opacity: { duration: 0.22 },
                       scale: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
                     }}
-                    drag={items.length > 1 ? "x" : false}
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.08}
-                    onDragEnd={handleDragEnd}
-                    className="flex h-full w-full cursor-grab touch-pan-y items-center justify-center active:cursor-grabbing"
+                    className="flex h-full w-full items-center justify-center"
                   >
                     {item.asset?.url ? item.mediaKind === "video" ? (
                       <VideoPlayer
@@ -229,7 +132,7 @@ export function VisualGalleryLightbox({
                       {item.description ? (
                         <MentionText text={item.description} />
                       ) : (
-                        "No description added for this piece."
+                        "no description added for this piece."
                       )}
                     </p>
                   </div>
@@ -249,18 +152,10 @@ export function VisualGalleryLightbox({
                         /{profile.username}/{item.slug}
                       </Link>
                     ) : (
-                      <span className="text-gray-500">Unavailable</span>
+                      <span className="text-gray-500">unavailable</span>
                     )}
                   </div>
 
-                  {items.length > 1 && (
-                    <div>
-                      <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-gray-500">position</p>
-                      <p className="text-gray-300">
-                        {currentIndex + 1} of {items.length}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </aside>
             </div>

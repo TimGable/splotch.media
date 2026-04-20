@@ -2,19 +2,19 @@
 
 :root {
   --font-size: 16px;
-  --background: #000000;
+  --background: #050505;
   --foreground: oklch(0.985 0 0);
-  --card: #000000;
+  --card: #0d0d0d;
   --card-foreground: oklch(0.985 0 0);
-  --popover: #000000;
+  --popover: #0d0d0d;
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.985 0 0);
-  --primary-foreground: #000000;
-  --secondary: oklch(0.205 0 0);
+  --primary-foreground: #050505;
+  --secondary: #0d0d0d;
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.205 0 0);
+  --muted: #0d0d0d;
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.205 0 0);
+  --accent: #0d0d0d;
   --accent-foreground: oklch(0.985 0 0);
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
@@ -31,10 +31,10 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: #000000;
+  --sidebar: #0d0d0d;
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.985 0 0);
-  --sidebar-primary-foreground: #000000;
+  --sidebar-primary-foreground: #050505;
   --sidebar-accent: oklch(0.205 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: rgba(255, 255, 255, 0.12);
@@ -126,7 +126,8 @@
   }
 
   body {
-    @apply min-h-screen overflow-x-hidden bg-black text-white;
+    @apply min-h-screen overflow-x-hidden text-white;
+    background: #050505;
   }
 
   /**
@@ -137,7 +138,7 @@
   html {
     font-size: var(--font-size);
     scroll-behavior: smooth;
-    background: #000;
+    background: #050505;
     color: #fff;
     overflow-x: hidden;
   }
@@ -259,6 +260,111 @@
     transition-property: color, background-color, border-color, opacity, box-shadow;
   }
 
+  .bg-black {
+    background-color: #0d0d0d !important;
+  }
+
+  .bg-black\/18 {
+    background-color: rgb(13 13 13 / 0.18) !important;
+  }
+
+  .bg-black\/20 {
+    background-color: rgb(13 13 13 / 0.2) !important;
+  }
+
+  .bg-black\/35 {
+    background-color: rgb(13 13 13 / 0.35) !important;
+  }
+
+  .bg-black\/40 {
+    background-color: rgb(13 13 13 / 0.4) !important;
+  }
+
+  .bg-black\/45 {
+    background-color: rgb(13 13 13 / 0.45) !important;
+  }
+
+  .bg-black\/50 {
+    background-color: rgb(13 13 13 / 0.5) !important;
+  }
+
+  .bg-black\/55 {
+    background-color: rgb(13 13 13 / 0.55) !important;
+  }
+
+  .bg-black\/60 {
+    background-color: rgb(13 13 13 / 0.6) !important;
+  }
+
+  .bg-black\/65 {
+    background-color: rgb(13 13 13 / 0.65) !important;
+  }
+
+  .bg-black\/70 {
+    background-color: rgb(13 13 13 / 0.7) !important;
+  }
+
+  .bg-black\/75 {
+    background-color: rgb(13 13 13 / 0.75) !important;
+  }
+
+  .bg-black\/80 {
+    background-color: rgb(13 13 13 / 0.8) !important;
+  }
+
+  .bg-black\/85 {
+    background-color: rgb(13 13 13 / 0.85) !important;
+  }
+
+  .bg-black\/88 {
+    background-color: rgb(13 13 13 / 0.88) !important;
+  }
+
+  .bg-black\/90 {
+    background-color: rgb(13 13 13 / 0.9) !important;
+  }
+
+  .bg-black\/92 {
+    background-color: rgb(13 13 13 / 0.92) !important;
+  }
+
+  .bg-black\/95 {
+    background-color: rgb(13 13 13 / 0.95) !important;
+  }
+
+  .bg-black\/96 {
+    background-color: rgb(13 13 13 / 0.96) !important;
+  }
+
+  .border-black {
+    border-color: #050505 !important;
+  }
+
+  .text-black {
+    color: #050505 !important;
+  }
+
+  .fill-black {
+    fill: #050505 !important;
+  }
+
+  .from-black\/30 {
+    --tw-gradient-from: rgb(5 5 5 / 0.3) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(5 5 5 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .from-black\/95 {
+    --tw-gradient-from: rgb(5 5 5 / 0.95) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(5 5 5 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .via-black\/70 {
+    --tw-gradient-via: rgb(13 13 13 / 0.7) var(--tw-gradient-via-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+  }
+
   input:hover:not(:disabled),
   textarea:hover:not(:disabled),
   select:hover:not(:disabled) {
@@ -325,6 +431,12 @@
 
     50% {
       opacity: 0.24;
+    }
+  }
+
+  @keyframes archive-feed-spin {
+    to {
+      transform: rotate(360deg);
     }
   }
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
 import { Heart, MessageCircle, Trash2 } from "lucide-react";
 import { MentionText } from "./mention-text";
 import { MentionTextarea } from "./mention-textarea";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { buildPublicProfilePath } from "@/lib/media-slugs";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
 
 export function MediaSocialPanel({
@@ -352,6 +354,25 @@ export function MediaSocialPanel({
               {social.comments.map((comment) => {
                 const depth = commentDepths.get(comment.id) || 0;
                 const indentPx = Math.min(depth, 4) * 20;
+                const authorUsername = comment.author?.username || "";
+                const authorLabel =
+                  comment.author?.displayName || comment.author?.username || "archive user";
+                const authorPath = authorUsername ? buildPublicProfilePath(authorUsername) : "";
+                const avatarNode = (
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-white/[0.05]">
+                    {comment.author?.avatarUrl ? (
+                      <img
+                        src={comment.author.avatarUrl}
+                        alt={authorLabel}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xs uppercase text-gray-400">
+                        {authorLabel.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                );
                 return (
                 <motion.div
                   key={comment.id}
@@ -362,26 +383,29 @@ export function MediaSocialPanel({
                 >
                   <div className="mb-3 flex items-start justify-between gap-4">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-white/[0.05]">
-                        {comment.author?.avatarUrl ? (
-                          <img
-                            src={comment.author.avatarUrl}
-                            alt={comment.author.displayName || comment.author.username}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs uppercase text-gray-400">
-                            {(comment.author?.displayName || comment.author?.username || "?")
-                              .charAt(0)
-                              .toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+                      {authorPath ? (
+                        <Link
+                          href={authorPath}
+                          aria-label={`Open ${authorLabel}'s profile`}
+                          className="flex-shrink-0 rounded-full transition-opacity hover:opacity-80"
+                        >
+                          {avatarNode}
+                        </Link>
+                      ) : (
+                        avatarNode
+                      )}
 
                       <div className="min-w-0">
-                        <p className="truncate text-sm text-white">
-                          {comment.author?.displayName || comment.author?.username || "archive user"}
-                        </p>
+                        {authorPath ? (
+                          <Link
+                            href={authorPath}
+                            className="block truncate text-sm text-white transition-colors hover:text-gray-300"
+                          >
+                            {authorLabel}
+                          </Link>
+                        ) : (
+                          <p className="truncate text-sm text-white">{authorLabel}</p>
+                        )}
                         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-500">
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </p>

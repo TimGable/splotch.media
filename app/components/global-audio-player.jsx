@@ -98,6 +98,75 @@ export function GlobalAudioPlayer({
   }, [isPlaying, currentTrack?.track?.audioUrl]);
 
   useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator) || !currentTrack) {
+      return undefined;
+    }
+
+    const artwork = coverArt
+      ? [
+          { src: coverArt, sizes: "96x96", type: "image/jpeg" },
+          { src: coverArt, sizes: "128x128", type: "image/jpeg" },
+          { src: coverArt, sizes: "192x192", type: "image/jpeg" },
+          { src: coverArt, sizes: "256x256", type: "image/jpeg" },
+          { src: coverArt, sizes: "512x512", type: "image/jpeg" },
+        ]
+      : [];
+
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title: currentTrack.track.title || "untitled track",
+      artist: currentTrack.artist.name || "artist",
+      album: currentTrack.release.title || "",
+      artwork,
+    });
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+    navigator.mediaSession.setActionHandler("play", onPlayPause);
+    navigator.mediaSession.setActionHandler("pause", onPlayPause);
+    navigator.mediaSession.setActionHandler("previoustrack", canSkipPrevious ? onSkipPrevious : null);
+    navigator.mediaSession.setActionHandler("nexttrack", canSkipNext ? onSkipNext : null);
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (typeof details.seekTime === "number") {
+        onSeek(details.seekTime, audioRef.current);
+      }
+    });
+
+    return () => {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+      navigator.mediaSession.setActionHandler("previoustrack", null);
+      navigator.mediaSession.setActionHandler("nexttrack", null);
+      navigator.mediaSession.setActionHandler("seekto", null);
+    };
+  }, [
+    canSkipNext,
+    canSkipPrevious,
+    coverArt,
+    currentTrack,
+    isPlaying,
+    onPlayPause,
+    onSeek,
+    onSkipNext,
+    onSkipPrevious,
+  ]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) {
+      return;
+    }
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+    if ("setPositionState" in navigator.mediaSession && Number.isFinite(duration) && duration > 0) {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: 1,
+        position: Math.max(0, Math.min(currentTime || 0, duration)),
+      });
+    }
+  }, [currentTime, duration, isPlaying]);
+
+  useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
     }
@@ -325,15 +394,27 @@ export function GlobalAudioPlayer({
 
           <motion.button
             onClick={onPlayPause}
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 transition-all hover:border-white/60 hover:bg-white/5"
-            whileHover={SOFT_BUTTON_HOVER}
+            className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/20 leading-none transition-colors hover:border-white/60 hover:bg-white/5"
+            whileHover={{ scale: 1.01, transition: SOFT_BUTTON_HOVER.transition }}
             whileTap={SOFT_BUTTON_TAP}
+            aria-label={isPlaying ? "Pause track" : "Play track"}
           >
-            {isPlaying ? (
-              <Pause className="h-5 w-5" />
-            ) : (
-              <Play className="ml-0.5 h-5 w-5" />
-            )}
+            <span
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${
+                isPlaying ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden="true"
+            >
+              <Pause className="block h-5 w-5" />
+            </span>
+            <span
+              className={`absolute inset-0 flex translate-x-px items-center justify-center transition-opacity duration-150 ${
+                isPlaying ? "opacity-0" : "opacity-100"
+              }`}
+              aria-hidden="true"
+            >
+              <Play className="block h-5 w-5" />
+            </span>
           </motion.button>
 
           <motion.button
