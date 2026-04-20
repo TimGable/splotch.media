@@ -11,11 +11,11 @@ export function InteractiveBackground() {
       />
       <div className="absolute inset-0 bg-[#050505]/25" />
       <div
-        className="absolute inset-0 opacity-25"
+        className="absolute inset-0 opacity-46"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px)
+            linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px)
           `,
           backgroundSize: "80px 80px",
         }}
