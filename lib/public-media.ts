@@ -39,6 +39,24 @@ type RawMediaItem = {
   trackNumber?: number | null;
 };
 
+type SignedUrlOptions = {
+  transform?: {
+    width: number;
+    resize: "contain";
+  };
+};
+
+type SignedUrlStorage = {
+  createSignedUrl: (
+    path: string,
+    expiresIn: number,
+    options?: SignedUrlOptions,
+  ) => Promise<{
+    data: { signedUrl?: string } | null;
+    error: { message: string } | null;
+  }>;
+};
+
 async function createSignedAssetPayload(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
   asset: {
@@ -57,8 +75,12 @@ async function createSignedAssetPayload(
     options.previewWidth && asset.mime_type?.startsWith("image/")
       ? { transform: { width: options.previewWidth, resize: "contain" as const } }
       : undefined;
-  const { data: signedData, error: signedError } = await (supabase.storage.from(asset.bucket) as any)
-    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS, signedUrlOptions);
+  const storage = supabase.storage.from(asset.bucket) as unknown as SignedUrlStorage;
+  const { data: signedData, error: signedError } = await storage.createSignedUrl(
+    asset.object_key,
+    SIGNED_URL_TTL_SECONDS,
+    signedUrlOptions,
+  );
 
   if (!signedError) {
     assetUrl = signedData?.signedUrl ?? null;
@@ -80,6 +102,7 @@ async function loadProfileBase(username: string) {
   }
 
   const supabase = createSupabaseServiceRoleClient();
+  // Public pages start from the profile record, then add only the user and social fields needed for display.
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("user_id, username, display_name, bio, avatar_asset_id")
@@ -195,6 +218,7 @@ async function loadMediaItems(
   const collectionTitleById = new Map<string, string>();
   const trackNumberByItemId = new Map<string, number | null>();
 
+  // Assemble signed assets, collection titles, track numbers, and social counts into one public payload.
   if (itemIds.length > 0) {
     const { data: assets, error: assetsError } = await supabase
       .from("media_assets")
@@ -486,6 +510,7 @@ export async function getPublicMediaPageData(username: string, mediaSlug: string
   const items = await loadMediaItems(base.supabase, base.profile.userId, ["public", "unlisted"]);
   const matchingItems = items.filter((entry) => entry.slug === String(mediaSlug || "").trim());
   const item = matchingItems.sort((first, second) => {
+    // Duplicate slugs can happen across tracks in a release, so pick the earliest track deterministically.
     const firstTrackNumber = first.trackNumber ?? Number.MAX_SAFE_INTEGER;
     const secondTrackNumber = second.trackNumber ?? Number.MAX_SAFE_INTEGER;
     if (firstTrackNumber !== secondTrackNumber) {

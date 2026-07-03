@@ -226,7 +226,7 @@ export async function POST(request: Request, { params }: Params) {
           return NextResponse.json(
             {
               error:
-                "Email rate limit exceeded. Configure RESEND_API_KEY, FROM_EMAIL, and NOTIFY_OWNER_EMAIL to use fallback delivery.",
+                "Email rate limit exceeded and fallback delivery is not configured.",
             },
             { status: 429 },
           );
@@ -296,7 +296,7 @@ export async function POST(request: Request, { params }: Params) {
             return NextResponse.json(
               {
                 error:
-                  "Recovery email rate limit exceeded. Configure RESEND_API_KEY, FROM_EMAIL, and NOTIFY_OWNER_EMAIL to use fallback delivery.",
+                  "Recovery email rate limit exceeded and fallback delivery is not configured.",
               },
               { status: 429 },
             );
@@ -334,7 +334,6 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const nowIso = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { error: invitesInsertError } = await supabase.from("invites").insert({
       code: crypto.randomUUID().replace(/-/g, ""),
@@ -343,7 +342,6 @@ export async function POST(request: Request, { params }: Params) {
       created_by_user_id: userId,
       request_id: requestId,
       sent_at: nowIso,
-      expires_at: expiresAt,
     });
 
     if (invitesInsertError) {

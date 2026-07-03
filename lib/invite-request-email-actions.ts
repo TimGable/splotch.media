@@ -5,7 +5,6 @@ export type InviteEmailAction = "approve" | "deny";
 type InviteEmailActionPayload = {
   requestId: string;
   action: InviteEmailAction;
-  exp: number;
 };
 
 function getInviteEmailActionSecret() {
@@ -31,12 +30,10 @@ function sign(value: string) {
 export function createInviteEmailActionToken(
   requestId: string,
   action: InviteEmailAction,
-  expiresInSeconds = 60 * 60 * 24 * 7,
 ) {
   const payload: InviteEmailActionPayload = {
     requestId,
     action,
-    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
   };
 
   const payloadEncoded = toBase64Url(JSON.stringify(payload));
@@ -63,10 +60,6 @@ export function verifyInviteEmailActionToken(
 
   if (payload.requestId !== requestId || payload.action !== action) {
     return { valid: false, error: "Token does not match request/action." as const };
-  }
-
-  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
-    return { valid: false, error: "Token has expired." as const };
   }
 
   const expectedSignature = sign(payloadEncoded);

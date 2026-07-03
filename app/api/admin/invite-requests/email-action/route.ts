@@ -141,7 +141,7 @@ export async function GET(request: Request) {
 
         if (!isEmailNotificationsEnabled()) {
           throw new Error(
-            "Email rate limit exceeded and Resend fallback is not configured. Set RESEND_API_KEY, FROM_EMAIL, and NOTIFY_OWNER_EMAIL.",
+            "Email rate limit exceeded and fallback delivery is not configured.",
           );
         }
 
@@ -195,7 +195,7 @@ export async function GET(request: Request) {
             sentViaResendFallback = true;
           } else if (isEmailRateLimitAuthError(recoveryError.message || "")) {
             throw new Error(
-              "Recovery email rate limit exceeded and Resend fallback is not configured. Set RESEND_API_KEY, FROM_EMAIL, and NOTIFY_OWNER_EMAIL.",
+              "Recovery email rate limit exceeded and fallback delivery is not configured.",
             );
           } else {
           throw new Error(`Failed to send recovery email: ${recoveryError.message}`);
@@ -238,14 +238,12 @@ export async function GET(request: Request) {
       throw new Error(updateError.message);
     }
 
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { error: invitesInsertError } = await supabase.from("invites").insert({
       code: crypto.randomUUID().replace(/-/g, ""),
       email: inviteRequest.email,
       status: "sent",
       request_id: requestId,
       sent_at: nowIso,
-      expires_at: expiresAt,
     });
 
     if (invitesInsertError) {

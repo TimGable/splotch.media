@@ -22,7 +22,7 @@ BEGIN
     CREATE TYPE invite_request_status AS ENUM ('pending', 'approved', 'rejected', 'withdrawn');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invite_status') THEN
-    CREATE TYPE invite_status AS ENUM ('created', 'sent', 'used', 'expired', 'revoked');
+    CREATE TYPE invite_status AS ENUM ('created', 'sent', 'used', 'revoked');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'asset_role') THEN
     CREATE TYPE asset_role AS ENUM (
@@ -91,7 +91,6 @@ CREATE TABLE IF NOT EXISTS invites (
   created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   request_id UUID REFERENCES invite_requests(id) ON DELETE SET NULL,
   sent_at TIMESTAMPTZ,
-  expires_at TIMESTAMPTZ,
   used_by_user_id UUID UNIQUE REFERENCES users(id) ON DELETE SET NULL,
   used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()

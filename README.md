@@ -1,132 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# splotch
 
-## Getting Started
+splotch is a community based, independently created/operated multimedia archive/streaming platform. All are welcome to use the service for no cost. 
 
-First, run the development server:
+## Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+The application gives artists a focused archive for presenting their work without the noise of a traditional social feed. Creators can upload single tracks, multi-track releases, images, and videos, manage profile details, follow other artists; like and comment on public media, and share clean public links for individual posts.
+
+Administrative tools support invite request review, moderator access, and community announcements. Public pages are server-rendered where possible so artist profiles and media pages load quickly and remain easy to share.
+
+## Core Features
+
+- Authenticated creator dashboard with profile setup and account management
+- Music, visual art, and video upload workflows
+- Multi-track music release support for singles, EPs, and albums
+- Public artist profiles with shareable media URLs
+- Follow, like, comment, and mention interactions
+- Personalized home feed with discovery fallback
+- Admin and moderator invite request management
+- Community announcement board
+- Responsive interface built with React, Next.js, Tailwind CSS, and Radix UI primitives
+
+## Technical Highlights
+
+- **Next.js App Router:** route handlers provide the application API while server components load public profile and media data.
+- **Supabase integration:** authentication, relational data, storage, and signed media access are handled through typed helper modules.
+- **Direct media uploads:** large files upload to storage through signed upload URLs instead of passing through the application server.
+- **Media response shaping:** shared library functions normalize database rows into UI-friendly payloads with social counts, cover art, previews, and release metadata.
+- **Progressive UI behavior:** animated view transitions, persistent audio playback, infinite feed loading, and optimistic social updates keep the experience responsive.
+- **Database-first design:** schema and migrations live in `db/` so the data model can be reviewed alongside the application code.
+
+## Project Structure
+
+```text
+app/                  Next.js routes, pages, API handlers, and React components
+app/components/       Dashboard, public pages, upload flow, feed, and UI primitives
+app/api/              Route handlers for auth, media, profile, feed, admin, and social actions
+lib/                  Shared Supabase, upload, notification, routing, and media helpers
+db/                   SQL schema and migrations
+docs/                 Architecture notes
+styles/               Tailwind and global styling
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Local Postgres
-
-Start a local PostgreSQL instance with Docker:
+Install dependencies:
 
 ```bash
-docker compose up -d
+npm install
 ```
 
-Default connection values:
-
-- Host: `localhost`
-- Port: `5432`
-- Database: `splotch`
-- User: `oma_app`
-- Password: `oma_dev_password`
-
-The initial schema is loaded from [`db/schema.sql`](./db/schema.sql) on first container initialization.
-
-Stop database:
-
-```bash
-docker compose down
-```
-
-Reset database (destroys local data volume and re-runs schema init):
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-## Supabase Setup (Cloud)
-
-This project is configured to use Supabase for cloud database access via Next.js route handlers.
-
-1. Copy env template and fill values:
-
-```bash
-cp .env.example .env.local
-```
-
-Required variables:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (server only; never expose in client code)
-- `APP_BASE_URL` (your canonical deployed URL, `https://splotchmedia.com`; used in emails and `/create-password` redirects)
-- `INVITE_EMAIL_ACTION_SECRET` (optional; secret for one-click owner email approve/deny buttons)
-- `RESEND_API_KEY` (optional; enables admin email notifications)
-- `FROM_EMAIL` (optional; sender identity for app emails)
-- `NOTIFY_OWNER_EMAIL` (optional; receives invite request notifications)
-- `NOTIFY_INVITE_REQUEST_EMAILS` (optional; comma-separated admin/moderator emails that receive invite approval links; falls back to `NOTIFY_OWNER_EMAIL`)
-
-On Vercel, set `APP_BASE_URL=https://splotchmedia.com` in Project Settings -> Environment Variables for Production. If it is omitted, the app falls back to Vercel's deployment URL environment variables, then to `http://localhost:3000` for local development.
-
-For deployed invite approval emails:
-
-- Set the Supabase variables in Vercel so API routes can read/write `invite_requests`, `invites`, and `users`.
-- Set `RESEND_API_KEY`, `FROM_EMAIL`, and `NOTIFY_INVITE_REQUEST_EMAILS` in Vercel. Resend only sends the email; the Vercel API route handles the database update when a moderator clicks approve or deny.
-- In Resend, verify `splotchmedia.com` and use a sender on that domain, for example `Our Media Archive <invites@splotchmedia.com>`.
-- In Supabase Auth settings, set the site URL to `https://splotchmedia.com` and add `https://splotchmedia.com/create-password` to allowed redirect URLs.
-
-`NOTIFY_INVITE_REQUEST_EMAILS=1timgable@gmail.com` is fine for receiving moderator approval emails. It does not make Resend able to send approved invite links to other people. To send invite approvals to requester emails, Resend requires a verified sender domain and a `FROM_EMAIL` on that domain.
-
-2. In Supabase SQL Editor, run schema:
-
-- [`db/schema.sql`](./db/schema.sql)
-
-3. Start app:
+Run the development server:
 
 ```bash
 npm run dev
 ```
 
-### API routes added
+Open `http://localhost:3000` in a browser.
 
-- `POST /api/invite-requests`
-- `GET /api/profile` (requires `Authorization: Bearer <access_token>`)
-- `PATCH /api/profile` (requires `Authorization: Bearer <access_token>`)
-- `GET /api/admin/invite-requests` (admin-only; requires `Authorization: Bearer <access_token>`)
-- `POST /api/admin/invite-requests/:requestId/approve` (admin-only; sends Supabase invite email)
-- `POST /api/admin/invite-requests/:requestId/resend-link` (admin-only; resends password-setup link)
-- `POST /api/admin/invite-requests/:requestId/deny` (admin-only; requires `{ "reason": "..." }`, stores note, emails requester)
-- `DELETE /api/admin/invite-requests/:requestId` (admin-only; deletes previously handled request)
-- `GET /api/admin/invite-requests/email-action?requestId=...&action=approve|deny&token=...` (owner email quick action)
+This project expects a configured Supabase project and local environment file for authentication, storage, and email delivery. Sensitive deployment values are intentionally not documented in this repository. Configure them through your local environment and hosting provider settings.
 
-To grant your owner account admin access, set `is_admin = true` on your row in `public.users`.
+## Database
 
-Example in Supabase SQL Editor:
+The database schema and migration history are included for review:
 
-```sql
-update public.users
-set is_admin = true
-where email = 'your-owner-email@example.com';
+- `db/schema.sql`
+- `db/migrations/`
+
+For a fresh environment, apply the base schema first, then run the migrations in chronological order.
+
+## Quality Checks
+
+Run linting before submitting changes:
+
+```bash
+npm run lint
 ```
 
-## Learn More
+Create a production build:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Portfolio Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This repository demonstrates a production-style React and Next.js application with server-side data loading, authenticated API routes, media storage workflows, reusable UI components, and a relational database model. The code favors small helper modules for repeated domain logic so route handlers and components stay focused on user-facing behavior.

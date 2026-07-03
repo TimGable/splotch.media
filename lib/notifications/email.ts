@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_DELIVERY_TOKEN = process.env.RESEND_DELIVERY_TOKEN;
 const NOTIFY_OWNER_EMAIL = process.env.NOTIFY_OWNER_EMAIL;
 const NOTIFY_INVITE_REQUEST_EMAILS = process.env.NOTIFY_INVITE_REQUEST_EMAILS;
 const FROM_EMAIL = process.env.FROM_EMAIL;
@@ -14,7 +14,7 @@ function getInviteNotificationRecipients() {
 }
 
 function hasEmailConfig() {
-  return Boolean(RESEND_API_KEY && FROM_EMAIL && getInviteNotificationRecipients().length > 0);
+  return Boolean(RESEND_DELIVERY_TOKEN && FROM_EMAIL && getInviteNotificationRecipients().length > 0);
 }
 
 export function isEmailNotificationsEnabled() {
@@ -55,7 +55,7 @@ export async function sendInviteRequestNotification(params: {
 }) {
   if (!hasEmailConfig()) return;
 
-  const resend = new Resend(RESEND_API_KEY);
+  const resend = new Resend(RESEND_DELIVERY_TOKEN);
 
   const subject = `New invite request: ${params.requesterEmail}`;
   const text = [
@@ -106,7 +106,7 @@ export async function sendApprovedInviteLinkEmail(params: {
 }) {
   if (!hasEmailConfig()) return;
 
-  const resend = new Resend(RESEND_API_KEY);
+  const resend = new Resend(RESEND_DELIVERY_TOKEN);
 
   const subject = "Your invite was approved - set your password";
   const text = [
@@ -132,7 +132,7 @@ export async function sendDeniedInviteEmail(params: {
 }) {
   if (!hasEmailConfig()) return;
 
-  const resend = new Resend(RESEND_API_KEY);
+  const resend = new Resend(RESEND_DELIVERY_TOKEN);
 
   const subject = "Your invite request was not approved";
   const text = [

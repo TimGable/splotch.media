@@ -109,7 +109,6 @@ export function Dashboard({ onSignOut }) {
     setCurrentTime,
     setDuration,
     seekTrack,
-    skipTrack,
   } = usePublicAudio();
 
   const openPublicProfile = (artist, returnView) => {
@@ -136,6 +135,7 @@ export function Dashboard({ onSignOut }) {
     router.push(buildPublicMediaPath(item.artist.username, item.slug));
   };
 
+  // Dashboard sections are rendered as in-app views, so this small history stack gives users a natural back flow.
   const navigateToView = (nextView, { recordHistory = true } = {}) => {
     setCurrentView((current) => {
       if (current === nextView) {
@@ -207,6 +207,7 @@ export function Dashboard({ onSignOut }) {
       const setupRequired = isGeneratedUsername(payload?.profile?.username);
       setForceProfileSetup(setupRequired);
       if (setupRequired) {
+        // Generated usernames mean the account exists but still needs a human-facing profile before browsing.
         viewHistoryRef.current = ["home"];
         navigateToView("profile", { recordHistory: false });
       }
@@ -232,6 +233,7 @@ export function Dashboard({ onSignOut }) {
       .filter((queueItem) => queueItem?.asset?.url)
       .map((queueItem) => createProfileQueueEntry(queueItem, artist));
 
+    // Build the queue from the visible profile list so skip/previous follows the order the user can see.
     const nextQueueIndex = queue.findIndex((entry) => entry.track.id === item.id);
     if (nextQueueIndex === -1) {
       return;
@@ -280,6 +282,7 @@ export function Dashboard({ onSignOut }) {
     const removedIndex = playbackQueue.findIndex((entry) => entry.track.id === mediaItemId);
     const nextQueue = playbackQueue.filter((entry) => entry.track.id !== mediaItemId);
 
+    // Keep the global player consistent when a track is removed from the user's archive.
     setPlaybackQueue(nextQueue);
 
     if (currentTrack?.track?.id === mediaItemId) {
@@ -349,10 +352,6 @@ export function Dashboard({ onSignOut }) {
 
   const handleSeekTrack = (time, audioElement) => {
     seekTrack(time, audioElement);
-  };
-
-  const handleSkipTrack = (direction) => {
-    skipTrack(direction);
   };
 
   const handlePlayFeedTrack = (item, feedItems) => {

@@ -116,6 +116,7 @@ function buildFeedEntries(items) {
   const entries = [];
   const releasesByCollectionId = new Map();
 
+  // Feed rows arrive as tracks, but albums and EPs read better when grouped into one release card.
   for (const item of items) {
     if (!isMultiTrackReleaseItem(item)) {
       entries.push({ kind: "single", id: item.id, item });
@@ -227,6 +228,7 @@ export function Feed({
           data: { session },
         } = await supabase.auth.getSession();
 
+        // Ignore stale responses when auth changes or a newer feed request starts before this one finishes.
         if (feedLoadRequestRef.current !== requestId) {
           return;
         }
@@ -371,6 +373,7 @@ export function Feed({
       { rootMargin: "360px 0px" },
     );
 
+    // Start loading before the sentinel is visible so the feed feels continuous while scrolling.
     observer.observe(trigger);
 
     return () => observer.disconnect();

@@ -38,6 +38,24 @@ export type CompletedUploadAsset = UploadAssetInput & {
   objectKey: string;
 };
 
+type SignedUrlOptions = {
+  transform?: {
+    width: number;
+    resize: "contain";
+  };
+};
+
+type SignedUrlStorage = {
+  createSignedUrl: (
+    path: string,
+    expiresIn: number,
+    options?: SignedUrlOptions,
+  ) => Promise<{
+    data: { signedUrl?: string } | null;
+    error: { message: string } | null;
+  }>;
+};
+
 export function sanitizeFileName(fileName: string) {
   const normalized = fileName.trim().toLowerCase().replace(/[^a-z0-9.\-_]+/g, "-");
   const collapsed = normalized.replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -94,6 +112,7 @@ export function buildObjectKey(params: {
   fileName: string;
   variant?: string;
 }) {
+  // Object keys include user, media, and asset IDs so storage cleanup can target one archive item safely.
   return `u/${params.userId}/m/${params.mediaItemId}/a/${params.assetId}/v1/${params.variant || "original"}/${params.fileName}`;
 }
 
@@ -114,8 +133,13 @@ export async function createSignedAssetPayload(
     options.previewWidth && asset.mime_type?.startsWith("image/")
       ? { transform: { width: options.previewWidth, resize: "contain" as const } }
       : undefined;
-  const { data: signedData, error: signedError } = await (supabase.storage.from(asset.bucket) as any)
-    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS, signedUrlOptions);
+  // Private media stays in storage; clients only receive short-lived signed URLs for playback or previews.
+  const storage = supabase.storage.from(asset.bucket) as unknown as SignedUrlStorage;
+  const { data: signedData, error: signedError } = await storage.createSignedUrl(
+    asset.object_key,
+    SIGNED_URL_TTL_SECONDS,
+    signedUrlOptions,
+  );
 
   if (!signedError) {
     assetUrl = signedData?.signedUrl ?? null;
@@ -215,6 +239,7 @@ export async function buildMediaListResponseItems(
   const collectionTitleById = new Map<string, string>();
   const trackNumberByItemId = new Map<string, number | null>();
 
+  // Batch related lookups so list pages avoid a database round trip for every media card.
   if (itemIds.length > 0) {
     const { data: assets, error: assetsError } = await supabase
       .from("media_assets")

@@ -38,6 +38,7 @@ function normalizeAsset(value: unknown): UploadAssetInput | null {
   const fileSizeBytes = Number(asset.fileSizeBytes);
   const trackNumber = asset.trackNumber == null ? null : Number(asset.trackNumber);
 
+  // Treat client upload metadata as untrusted input before any storage paths or rows are prepared.
   if (!clientId || !role || !fileName || !mimeType || !Number.isFinite(fileSizeBytes)) {
     return null;
   }
@@ -174,6 +175,7 @@ export async function POST(request: Request) {
     const preparedAssets: PreparedUploadAsset[] = [];
     const mediaItemIdByClientId = new Map<string, string>();
 
+    // Each original file becomes its own media item; cover art is linked back by the clientId prefix.
     for (const asset of originalAssets) {
       mediaItemIdByClientId.set(asset.clientId, crypto.randomUUID());
     }
@@ -200,6 +202,7 @@ export async function POST(request: Request) {
         .from(bucket)
         .createSignedUploadUrl(objectKey);
 
+      // The browser uploads directly to storage with this signed URL, avoiding large request bodies here.
       if (signedError || !signedData?.token || !signedData?.signedUrl) {
         return NextResponse.json(
           { error: `Failed to prepare upload URL: ${signedError?.message || "Unknown error."}` },

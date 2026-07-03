@@ -8,7 +8,7 @@ export function UploadProgressModal({ progress = 0 }) {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (normalizedProgress / 100) * circumference;
 
-  return (
+  return ( 
     <ViewportPortal>
       <motion.div
         className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 px-4 backdrop-blur-md"

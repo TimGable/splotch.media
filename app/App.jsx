@@ -15,6 +15,7 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
+    // Keep the first screen blank until Supabase confirms whether a user session already exists.
     supabase.auth
       .getSession()
       .then(({ data }) => {
@@ -44,12 +45,10 @@ export default function App() {
     };
   }, [supabase]);
 
-  // Handle first-time password change completion
   const handleFirstTimePasswordComplete = () => {
     setShowFirstTimePasswordChange(false);
   };
 
-  // Handle sign in
   const handleSignIn = async (email, password) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -71,7 +70,7 @@ export default function App() {
             error: "Sign-in attempt failed. Your email is not confirmed yet.",
           };
         }
-        if (raw.includes("invalid api key") || raw.includes("api key")) {
+        if (raw.includes("invalid credentials") || raw.includes("configuration")) {
           return {
             success: false,
             error: "Sign-in attempt failed. Authentication is temporarily unavailable.",
