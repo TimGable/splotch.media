@@ -184,7 +184,7 @@ export function CommunityAnnouncementsBoard({ onBack }) {
             rows={4}
             maxLength={3000}
             placeholder="share an update with the community..."
-            className="w-full resize-none border border-white/20 bg-transparent px-4 py-3 text-sm text-white transition-colors focus:border-white/50 focus:outline-none"
+            className="archive-scrollbar-thin w-full resize-none overflow-y-auto border border-white/20 bg-transparent px-4 py-3 text-sm text-white transition-colors focus:border-white/50 focus:outline-none"
           />
           <div className="mt-3 flex items-center justify-between gap-4">
             <p className="text-xs text-gray-500">{draftBody.length}/3000</p>
@@ -310,7 +310,7 @@ export function CommunityAnnouncementsBoard({ onBack }) {
                     rows={3}
                     maxLength={1000}
                     placeholder="leave a reply..."
-                    textareaClassName="w-full resize-none border border-white/20 bg-transparent px-4 py-3 text-sm text-white transition-colors focus:border-white/50 focus:outline-none"
+                    textareaClassName="archive-scrollbar-thin w-full resize-none overflow-y-auto border border-white/20 bg-transparent px-4 py-3 text-sm text-white transition-colors focus:border-white/50 focus:outline-none"
                   />
                   <div className="mt-3 flex items-center justify-between gap-4">
                     <p className="text-xs text-gray-500">{(commentDrafts[post.id] || "").length}/1000</p>
