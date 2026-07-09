@@ -1,10 +1,10 @@
 # splotch
 
-splotch is a community based, independently created/operated multimedia archive/streaming platform. All are welcome to request use the service at no cost for now. 
+splotch is a community based, independently created/operated multimedia archive/streaming platform. All are welcome to request use the service at no cost (currently).  
 
 ## Overview
 
-The application gives artists an archive for presenting/preserving their work without the annoyances that come along with hosting their creative work on large platforms. Creators can upload music (singles, EP's, and albums), images (traditional/digital art, photography, graphic design projects, even architectural designs), and videos (creative projects, music videos, edits)
+The application gives artists an archive for presenting/preserving their work without the annoyances that come along with hosting their creative projects on large platforms. Creators can upload music (singles, EP's, and albums), images (traditional/digital art, photography, graphic design projects, even architectural designs), and videos (creative projects, music videos, edits)
 
 Administrative tools support invite request review, moderator access such as removing harmful content or comments, and community announcements to help the userbase stay engaged and suggest changes/new features. Public pages are server-rendered where possible so artist profiles and media pages load quickly and remain easy to share.
 
