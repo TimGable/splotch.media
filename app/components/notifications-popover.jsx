@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AtSign, Bell, Heart, MessageCircle, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { createSupabaseBrowserClient, getStoredSupabaseAccessToken } from "@/lib/supabase/client";
 import { buildPublicMediaPath, buildPublicProfilePath } from "@/lib/media-slugs";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
 import { MentionText } from "./mention-text";
@@ -72,11 +72,8 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
     setIsLoading(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
+      const accessToken = getStoredSupabaseAccessToken();
+      if (!accessToken) {
         setNotifications([]);
         setUnreadCount(0);
         setIsLoading(false);
@@ -85,7 +82,7 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
 
       const response = await fetch("/api/notifications", {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -105,7 +102,7 @@ export function NotificationsPopover({ compact = false, onNavigate }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ action: "mark-all-read" }),
         }).catch(() => {});

@@ -2,16 +2,97 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+const WAVEFORM_STORAGE_PREFIX = "oma-waveform:v1:";
 const waveformCache = new Map();
 
+function getWaveformCacheKey(audioUrl, sampleCount) {
+  if (!audioUrl) {
+    return "";
+  }
+
+  try {
+    const parsedUrl = new URL(audioUrl);
+    // Signed URLs rotate, but the storage path is stable. Cache by path so a
+    // track viewed once can reuse its decoded peaks on the next signed URL.
+    return `${parsedUrl.origin}${parsedUrl.pathname}::${sampleCount}`;
+  } catch {
+    return `${audioUrl.split("?")[0]}::${sampleCount}`;
+  }
+}
+
+function readStoredWaveformPeaks(cacheKey, sampleCount) {
+  if (!cacheKey || typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(`${WAVEFORM_STORAGE_PREFIX}${cacheKey}`);
+    if (!storedValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(storedValue);
+    const peaks = Array.isArray(parsedValue?.peaks) ? parsedValue.peaks : null;
+    if (!peaks || peaks.length !== sampleCount) {
+      return null;
+    }
+
+    const normalizedPeaks = peaks.map((peak) => Number(peak));
+    if (normalizedPeaks.some((peak) => !Number.isFinite(peak))) {
+      return null;
+    }
+
+    return normalizedPeaks.map((peak) => Math.max(8, Math.min(100, Math.round(peak))));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredWaveformPeaks(cacheKey, peaks) {
+  if (!cacheKey || typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      `${WAVEFORM_STORAGE_PREFIX}${cacheKey}`,
+      JSON.stringify({ peaks, savedAt: Date.now() }),
+    );
+  } catch {}
+}
+
+function getCachedWaveformPeaks(audioUrl, sampleCount) {
+  const cacheKey = getWaveformCacheKey(audioUrl, sampleCount);
+  const cached = waveformCache.get(cacheKey);
+  if (Array.isArray(cached)) {
+    return cached;
+  }
+
+  const storedPeaks = readStoredWaveformPeaks(cacheKey, sampleCount);
+  if (storedPeaks) {
+    waveformCache.set(cacheKey, storedPeaks);
+    return storedPeaks;
+  }
+
+  return null;
+}
+
 async function loadWaveformPeaks(audioUrl, sampleCount) {
-  const cacheKey = `${audioUrl}::${sampleCount}`;
+  const cacheKey = getWaveformCacheKey(audioUrl, sampleCount);
   const cached = waveformCache.get(cacheKey);
   if (cached) {
     return cached instanceof Promise ? cached : Promise.resolve(cached);
   }
 
+  const storedPeaks = readStoredWaveformPeaks(cacheKey, sampleCount);
+  if (storedPeaks) {
+    waveformCache.set(cacheKey, storedPeaks);
+    return Promise.resolve(storedPeaks);
+  }
+
   const pending = (async () => {
+    // The first exact waveform costs an audio decode in the browser; after that
+    // the small normalized peak array is cached and reused.
     const response = await fetch(audioUrl);
     if (!response.ok) {
       throw new Error("Failed to load audio for waveform.");
@@ -52,6 +133,7 @@ async function loadWaveformPeaks(audioUrl, sampleCount) {
       );
 
       waveformCache.set(cacheKey, normalizedPeaks);
+      writeStoredWaveformPeaks(cacheKey, normalizedPeaks);
       return normalizedPeaks;
     } finally {
       await audioContext.close().catch(() => {});
@@ -77,8 +159,11 @@ export function Waveform({
   seekLabel,
   disabled = false,
 }) {
-  const [resolvedData, setResolvedData] = useState(data || []);
   const bars = useMemo(() => data || [], [data]);
+  const sampleCount = bars.length > 0 ? bars.length : 96;
+  const [resolvedData, setResolvedData] = useState(() =>
+    getCachedWaveformPeaks(audioUrl, sampleCount) || bars,
+  );
   const barWidth = 2;
   const gap = 1;
   const activeData = resolvedData.length > 0 ? resolvedData : bars;
@@ -107,9 +192,20 @@ export function Waveform({
       };
     }
 
+    const cachedPeaks = getCachedWaveformPeaks(audioUrl, sampleCount);
+    if (cachedPeaks) {
+      applyData(cachedPeaks);
+      return () => {
+        cancelled = true;
+        if (frame) {
+          window.cancelAnimationFrame(frame);
+        }
+      };
+    }
+
     applyData(bars);
 
-    loadWaveformPeaks(audioUrl, bars.length > 0 ? bars.length : 96)
+    loadWaveformPeaks(audioUrl, sampleCount)
       .then((nextData) => {
         if (!cancelled) {
           applyData(nextData);
@@ -127,7 +223,7 @@ export function Waveform({
         window.cancelAnimationFrame(frame);
       }
     };
-  }, [audioUrl, bars]);
+  }, [audioUrl, bars, sampleCount]);
 
   return (
     <div

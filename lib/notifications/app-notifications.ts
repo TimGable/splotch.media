@@ -23,6 +23,8 @@ export async function createAppNotification(input: CreateNotificationInput) {
   const supabase = createSupabaseServiceRoleClient();
 
   if (input.type === "follow" || input.type === "like") {
+    // Follows and likes describe the current state, so replace older copies
+    // instead of stacking identical notifications forever.
     let deleteQuery = supabase
       .from("notifications")
       .delete()

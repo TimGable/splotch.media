@@ -74,6 +74,8 @@ export function MentionTextarea({
 
   const triggerMentionSearch = useCallback(
     (nextValue, cursorPosition) => {
+      // Mentions are cursor-aware, so editing an old @name behaves the same as
+      // typing a new one at the end of the textarea.
       const trigger = findMentionTrigger(nextValue, cursorPosition);
       if (!trigger) {
         closeDropdown();
@@ -104,21 +106,6 @@ export function MentionTextarea({
       clearTimeout(handle);
     };
   }, [mentionQuery, fetchSuggestions]);
-
-  useEffect(() => {
-    if (!isDropdownOpen) {
-      return;
-    }
-
-    if (suggestions.length === 0 && !loading && mentionQuery !== null) {
-      // Keep dropdown visible to show "no matches" message.
-      return;
-    }
-
-    setHighlightedIndex((current) =>
-      Math.min(current, Math.max(suggestions.length - 1, 0)),
-    );
-  }, [suggestions, loading, isDropdownOpen, mentionQuery]);
 
   const handleTextareaChange = useCallback(
     (event) => {
@@ -152,6 +139,8 @@ export function MentionTextarea({
       const nextValue = `${before}${mentionText}${needsSpace}${after}`;
       onValueChange?.(nextValue);
 
+      // React updates the value first; then we put the caret after the inserted
+      // mention so the composer feels like a normal text editor.
       requestAnimationFrame(() => {
         if (!textareaRef.current) {
           return;
@@ -167,6 +156,11 @@ export function MentionTextarea({
     },
     [activeMention, closeDropdown, onValueChange, textValue],
   );
+
+  const activeSuggestionIndex =
+    suggestions.length > 0
+      ? Math.min(highlightedIndex, suggestions.length - 1)
+      : 0;
 
   const handleKeyDown = useCallback(
     (event) => {
@@ -189,17 +183,17 @@ export function MentionTextarea({
           (current - 1 + suggestions.length) % suggestions.length,
         );
       } else if (event.key === "Enter") {
-        if (suggestions[highlightedIndex]) {
+        if (suggestions[activeSuggestionIndex]) {
           event.preventDefault();
           event.stopPropagation();
-          insertSuggestion(suggestions[highlightedIndex]);
+          insertSuggestion(suggestions[activeSuggestionIndex]);
         }
       } else if (event.key === "Escape") {
         event.preventDefault();
         closeDropdown();
       }
     },
-    [isDropdownOpen, suggestions, highlightedIndex, insertSuggestion, closeDropdown],
+    [isDropdownOpen, suggestions, activeSuggestionIndex, insertSuggestion, closeDropdown],
   );
 
   useEffect(() => {
@@ -241,7 +235,7 @@ export function MentionTextarea({
             </p>
           ) : (
             suggestions.map((suggestion, index) => {
-              const isActive = index === highlightedIndex;
+              const isActive = index === activeSuggestionIndex;
               return (
                 <button
                   key={suggestion.userId}

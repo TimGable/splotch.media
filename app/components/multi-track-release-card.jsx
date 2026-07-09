@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Check, Copy, Disc3, Edit2, Ellipsis, Heart, ListPlus, MessageCircle, Pause, Play, Share2 } from "lucide-react";
 import { MentionText } from "./mention-text";
@@ -69,16 +69,23 @@ export function MultiTrackReleaseCard({
   onEditRelease,
   onShare,
   formatUploadDate,
-  formatFileSize,
   maxTrackListHeight = "max-h-44",
 }) {
   const [copiedShareUrl, setCopiedShareUrl] = useState("");
   const copiedShareTimeoutRef = useRef(null);
-  const tracks = release.tracks || [];
+  const tracks = useMemo(() => release.tracks || [], [release.tracks]);
   const coverUrl = release.coverAsset?.url || tracks[0]?.coverAsset?.url || "";
   const firstTrack = tracks[0];
   const shareUrl = onShare && firstTrack ? onShare(firstTrack) : "";
   const isReleaseLiked = release.isLiked || tracks.some((track) => track.isLiked);
+  const waveformDataByTrackId = useMemo(() => {
+    return new Map(
+      tracks.map((track) => [
+        track.id,
+        buildWaveformData(`${track.id}:${track.asset?.fileName || track.title}`),
+      ]),
+    );
+  }, [tracks]);
 
   useEffect(() => {
     return () => {
@@ -228,7 +235,7 @@ export function MultiTrackReleaseCard({
                       whileTap={SOFT_BUTTON_TAP}
                       aria-label={`${isTrackPlaying ? "Pause" : "Play"} ${track.title}`}
                     >
-                      {isTrackPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
+                      {isTrackPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 translate-x-px" />}
                     </motion.button>
 
                     <button
@@ -241,7 +248,7 @@ export function MultiTrackReleaseCard({
                       </span>
                       <div className="mt-1 overflow-hidden border border-white/10 bg-white/[0.02] px-1.5 py-0.5 md:px-2 md:py-1">
                         <Waveform
-                          data={buildWaveformData(`${track.id}:${track.asset?.fileName || track.title}`)}
+                          data={waveformDataByTrackId.get(track.id)}
                           audioUrl={track.asset?.url}
                           isPlaying={isTrackPlaying}
                           height={16}

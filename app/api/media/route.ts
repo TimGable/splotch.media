@@ -22,6 +22,17 @@ const IMAGE_PREVIEW_WIDTH = 900;
 const IMAGE_MIME_PREFIX = "image/";
 const BLOCKED_IMAGE_MIME_TYPES = new Set(["image/svg+xml"]);
 
+type SignedUrlStorage = {
+  createSignedUrl: (
+    path: string,
+    expiresIn: number,
+    options?: { transform?: { width: number; resize: "contain" } },
+  ) => Promise<{
+    data: { signedUrl?: string } | null;
+    error: { message: string } | null;
+  }>;
+};
+
 function sanitizeFileName(fileName: string) {
   const normalized = fileName.trim().toLowerCase().replace(/[^a-z0-9.\-_]+/g, "-");
   const collapsed = normalized.replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -116,8 +127,12 @@ async function createSignedAssetPayload(
     options.previewWidth && asset.mime_type?.startsWith("image/")
       ? { transform: { width: options.previewWidth, resize: "contain" as const } }
       : undefined;
-  const { data: signedData, error: signedError } = await (supabase.storage.from(asset.bucket) as any)
-    .createSignedUrl(asset.object_key, SIGNED_URL_TTL_SECONDS, signedUrlOptions);
+  const storage = supabase.storage.from(asset.bucket) as unknown as SignedUrlStorage;
+  const { data: signedData, error: signedError } = await storage.createSignedUrl(
+    asset.object_key,
+    SIGNED_URL_TTL_SECONDS,
+    signedUrlOptions,
+  );
 
   if (!signedError) {
     assetUrl = signedData?.signedUrl ?? null;
@@ -245,6 +260,8 @@ async function createMusicUploadRecord(params: {
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   let coverAssetId: string | null = null;
 
+  // Storage and database writes are not one transaction, so every later failure
+  // cleans up the object(s) already written. Not glamorous, very necessary.
   const { error: uploadError } = await supabase.storage.from(bucket).upload(objectKey, fileBuffer, {
     contentType: file.type || "application/octet-stream",
     upsert: false,

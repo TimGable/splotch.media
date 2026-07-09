@@ -71,6 +71,8 @@ async function createSignedAssetPayload(
   options: { previewWidth?: number } = {},
 ) {
   let assetUrl: string | null = null;
+  // Public pages never expose raw storage paths; every asset leaves through a
+  // short-lived signed URL, optionally resized for preview-heavy layouts.
   const signedUrlOptions =
     options.previewWidth && asset.mime_type?.startsWith("image/")
       ? { transform: { width: options.previewWidth, resize: "contain" as const } }
@@ -310,6 +312,8 @@ async function loadLikedTracks(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
   userId: string,
 ): Promise<PublicLikedTrack[]> {
+  // Likes are profile-facing, so private/unready tracks are filtered out even
+  // when the owner can technically see that they liked them.
   const { data: likedRows, error: likedRowsError } = await supabase
     .from("media_likes")
     .select("media_item_id, created_at")
@@ -401,6 +405,8 @@ async function loadLikedTracks(
   }
 
   const slugMap = new Map<string, string>();
+  // Slugs depend on an artist's public catalog, not just the liked rows, so
+  // duplicate titles still resolve to the same URLs used everywhere else.
   const { data: ownerPublicItems, error: ownerPublicItemsError } = await supabase
     .from("media_items")
     .select("id, owner_user_id, collection_id, music_release_type, title")

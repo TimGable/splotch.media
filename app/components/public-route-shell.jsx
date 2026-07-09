@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { InteractiveBackground } from "./interactive-background";
 import { SiteNavigation } from "./site-navigation";
 import { GlobalUploadFlow } from "./global-upload-flow";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { createSupabaseBrowserClient, getStoredSupabaseAccessToken } from "@/lib/supabase/client";
 import { buildPublicProfilePath } from "@/lib/media-slugs";
 import { rememberCurrentPathReturn } from "@/lib/public-navigation";
 import { FADE_UP_ANIMATION, PAGE_TRANSITION } from "@/lib/motion";
@@ -15,10 +15,13 @@ function isGeneratedUsername(username) {
   return typeof username === "string" && /_[a-f0-9]{8}$/.test(username);
 }
 
-export function PublicRouteShell({ children }) {
+export function PublicRouteShell({ children, requireAuth = false }) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [hasInitialAccessToken] = useState(() =>
+    typeof window === "undefined" ? true : Boolean(getStoredSupabaseAccessToken()),
+  );
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
@@ -33,28 +36,29 @@ export function PublicRouteShell({ children }) {
     let mounted = true;
 
     async function loadAccess() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const accessToken = getStoredSupabaseAccessToken();
 
       if (!mounted) {
         return;
       }
 
-      setIsSignedIn(Boolean(session));
+      setIsSignedIn(Boolean(accessToken));
 
-      if (!session?.access_token) {
+      if (!accessToken) {
         setIsAdmin(false);
         setIsModerator(false);
         setProfileUsername("");
         setProfileCategoryTags([]);
         setForceProfileSetup(false);
+        if (requireAuth) {
+          router.replace("/");
+        }
         return;
       }
 
       const response = await fetch("/api/profile", {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -88,7 +92,7 @@ export function PublicRouteShell({ children }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [requireAuth, router, supabase]);
 
   const handleHome = () => {
     router.push(isSignedIn ? "/#home" : "/");
@@ -148,6 +152,10 @@ export function PublicRouteShell({ children }) {
     await supabase.auth.signOut();
     router.push("/");
   };
+
+  if (requireAuth && !hasInitialAccessToken) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">

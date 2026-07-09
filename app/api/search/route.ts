@@ -5,6 +5,51 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 const RESULT_LIMIT = 6;
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
+type ProfileRow = {
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_asset_id: string | null;
+};
+
+type MediaSearchRow = {
+  id: string;
+  owner_user_id: string;
+  collection_id: string | null;
+  media_kind: string;
+  music_release_type: string | null;
+  title: string;
+  description: string | null;
+  created_at: string | null;
+  visibility: string;
+  state: string;
+};
+
+type MediaTitleRow = {
+  id: string;
+  owner_user_id: string;
+  collection_id: string | null;
+  music_release_type: string | null;
+  title: string;
+};
+
+type MediaResult = {
+  id: string;
+  title: string;
+  description: string | null;
+  mediaKind: string;
+  collectionTitle: string | null;
+  releaseType: string | null;
+  createdAt: string | null;
+  artist: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  previewUrl: string | null;
+  path: string;
+};
+
 function normalizeQuery(value: string) {
   return String(value || "").trim();
 }
@@ -45,6 +90,8 @@ export async function GET(request: Request) {
 
     const likePattern = `%${query.replace(/[%_]/g, "")}%`;
 
+    // Search artists and media separately, then merge the media hits so artist
+    // matches can still surface their work even when the title does not match.
     const { data: matchingProfiles, error: matchingProfilesError } = await supabase
       .from("profiles")
       .select("user_id, username, display_name, avatar_asset_id")
@@ -89,8 +136,8 @@ export async function GET(request: Request) {
       throw new Error(artistMatchesError.message);
     }
 
-    const mediaById = new Map<string, any>();
-    for (const item of [...(titleMatches ?? []), ...(artistMatches ?? [])]) {
+    const mediaById = new Map<string, MediaSearchRow>();
+    for (const item of [...((titleMatches ?? []) as MediaSearchRow[]), ...((artistMatches ?? []) as MediaSearchRow[])]) {
       mediaById.set(item.id, item);
     }
 
@@ -100,7 +147,7 @@ export async function GET(request: Request) {
       (userId) => !(matchingProfiles ?? []).some((profile) => profile.user_id === userId),
     );
 
-    let supplementalProfiles: any[] = [];
+    let supplementalProfiles: ProfileRow[] = [];
     if (ownerIdsMissingProfiles.length > 0) {
       const { data, error } = await supabase
         .from("profiles")
@@ -109,10 +156,10 @@ export async function GET(request: Request) {
       if (error) {
         throw new Error(error.message);
       }
-      supplementalProfiles = data ?? [];
+      supplementalProfiles = (data ?? []) as ProfileRow[];
     }
 
-    const allProfiles = [...(matchingProfiles ?? []), ...supplementalProfiles];
+    const allProfiles = [...((matchingProfiles ?? []) as ProfileRow[]), ...supplementalProfiles];
     const avatarAssetIds = [...new Set(allProfiles.map((profile) => profile.avatar_asset_id).filter(Boolean))];
     const avatarUrlByAssetId = new Map<string, string | null>();
 
@@ -155,6 +202,8 @@ export async function GET(request: Request) {
       throw new Error(allOwnerMediaTitles.error.message);
     }
 
+    // URL slugs are generated from each artist's full visible catalog so search
+    // results point at the same release paths as profile and notification links.
     const collectionIds = [
       ...new Set(
         (allOwnerMediaTitles.data ?? [])
@@ -180,7 +229,7 @@ export async function GET(request: Request) {
 
     const slugByMediaId = new Map<string, string>();
     const titlesByOwner = new Map<string, Array<{ id: string; title: string; collectionId: string | null; collectionTitle: string | null; releaseType: string | null }>>();
-    for (const item of allOwnerMediaTitles.data ?? []) {
+    for (const item of ((allOwnerMediaTitles.data ?? []) as MediaTitleRow[])) {
       titlesByOwner.set(item.owner_user_id, [
         ...(titlesByOwner.get(item.owner_user_id) ?? []),
         {
@@ -240,6 +289,8 @@ export async function GET(request: Request) {
 
         const collectionTitle = item.collection_id ? collectionTitleById.get(item.collection_id) || null : null;
 
+        // Multi-track releases should search as individual tracks but display as
+        // the release, otherwise albums look like a pile of duplicate singles.
         return {
           id: item.id,
           title: isMultiTrackRelease(item) ? collectionTitle || item.title : item.title,
@@ -253,7 +304,7 @@ export async function GET(request: Request) {
           path: buildPublicMediaPath(owner.username, slugByMediaId.get(item.id) || slugifyMediaTitle(item.title)),
         };
       })
-      .filter(Boolean) as any[];
+      .filter((item): item is MediaResult => Boolean(item));
 
     const media = {
       music: baseMediaResults.filter((item) => item.mediaKind === "music").slice(0, RESULT_LIMIT),

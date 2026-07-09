@@ -52,6 +52,36 @@ export function getStoredSupabaseUserId() {
   return null;
 }
 
+export function getStoredSupabaseAccessToken() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawSession = window.localStorage.getItem(getSupabaseBrowserStorageKey());
+    if (!rawSession) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawSession);
+    const candidates = [
+      parsed?.access_token,
+      parsed?.currentSession?.access_token,
+      parsed?.session?.access_token,
+    ];
+
+    if (Array.isArray(parsed)) {
+      for (const entry of parsed) {
+        candidates.push(entry?.access_token, entry?.currentSession?.access_token);
+      }
+    }
+
+    return candidates.find((token) => typeof token === "string" && token.length > 0) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function createSupabaseBrowserClient() {
   if (browserClient) {
     return browserClient;

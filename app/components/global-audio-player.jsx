@@ -102,6 +102,8 @@ export function GlobalAudioPlayer({
       return undefined;
     }
 
+    // Let the operating system lock screen and hardware keys control the same
+    // queue state as the in-page player.
     const artwork = coverArt
       ? [
           { src: coverArt, sizes: "96x96", type: "image/jpeg" },
@@ -177,6 +179,8 @@ export function GlobalAudioPlayer({
       return;
     }
 
+    // External seeks and track changes update React state first; only nudge the
+    // audio element when it has drifted enough to be noticeable.
     const nextTime = Math.max(0, currentTime);
     if (Math.abs((audioRef.current.currentTime || 0) - nextTime) > 0.15) {
       audioRef.current.currentTime = nextTime;
