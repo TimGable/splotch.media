@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ChevronDown, LogOut, Menu, Settings2, Upload, UserCircle2, X } from "lucide-react";
+import { MessagesNavButton } from "./messages-nav-button";
 import { NotificationsPopover } from "./notifications-popover";
 import { SiteSearch } from "./site-search";
 import {
@@ -173,12 +174,22 @@ export function SiteNavigation({
               </motion.button>
             ) : null}
 
-            {(onAccountSettings || onUpload) ? <NotificationsPopover /> : null}
+            {(onAccountSettings || onUpload) ? (
+              <div className="flex items-center gap-2">
+                <MessagesNavButton />
+                <NotificationsPopover />
+              </div>
+            ) : null}
             {profileMenu}
           </div>
 
           <div className="flex items-center gap-2 lg:hidden">
-            {(onAccountSettings || onUpload) ? <NotificationsPopover compact /> : null}
+            {(onAccountSettings || onUpload) ? (
+              <>
+                <MessagesNavButton compact />
+                <NotificationsPopover compact />
+              </>
+            ) : null}
             {profileMenu}
             {canModerate && onAdmin ? (
               <motion.button

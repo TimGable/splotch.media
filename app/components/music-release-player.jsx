@@ -259,7 +259,7 @@ export function MusicReleasePlayer({
                 {isPlaying && isActive ? (
                   <Pause className="h-4.5 w-4.5" />
                 ) : (
-                  <Play className="ml-0.5 h-4.5 w-4.5" />
+                  <Play className="h-4.5 w-4.5 translate-x-px" />
                 )}
               </motion.button>
 

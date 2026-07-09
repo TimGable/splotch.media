@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Edit2, Heart, MessageCircle, Music, Palette, Plus, Video } from "lucide-react";
+import { Edit2, Heart, MessageCircle, MessageSquare, Music, Palette, Plus, Video } from "lucide-react";
 import { MusicReleasePlayer } from "./music-release-player";
 import { MultiTrackReleaseCard } from "./multi-track-release-card";
 import { MentionText } from "./mention-text";
@@ -181,6 +181,8 @@ export function ProfileArchiveView({
   isFollowing = false,
   isUpdatingFollow = false,
   onFollowToggle,
+  onMessageProfile,
+  isMessagingAvailable = false,
   headerActions = null,
   headerTopRight = null,
   headerBottomRight = null,
@@ -285,6 +287,19 @@ export function ProfileArchiveView({
                   whileTap={SOFT_BUTTON_TAP}
                 >
                   {isFollowing ? "unfollow" : "follow"}
+                </motion.button>
+              ) : null}
+
+              {isMessagingAvailable && onMessageProfile ? (
+                <motion.button
+                  type="button"
+                  onClick={onMessageProfile}
+                  className="inline-flex items-center gap-2 border border-white/25 bg-white/[0.03] px-4 py-2.5 text-sm tracking-wide text-white transition-colors hover:border-white/50 hover:bg-white/[0.07] md:px-5 md:py-3"
+                  whileHover={SOFT_BUTTON_HOVER}
+                  whileTap={SOFT_BUTTON_TAP}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>message</span>
                 </motion.button>
               ) : null}
 

@@ -9,6 +9,7 @@ import { usePublicAudio } from "./public-audio-context";
 import { ProfileArchiveView } from "./profile-archive-view";
 import { ProfileConnectionsModal } from "./profile-connections-modal";
 import { LikedTracksPanel } from "./liked-tracks-panel";
+import { MessageComposer } from "./message-composer";
 import { MyProfile } from "./my-profile";
 import { buildPublicMediaPath } from "@/lib/media-slugs";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -71,6 +72,7 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
   const [isUpdatingModerator, setIsUpdatingModerator] = useState(false);
   const [isUpdatingFollow, setIsUpdatingFollow] = useState(false);
   const [isNavigatingBack, setIsNavigatingBack] = useState(false);
+  const [isMessageComposerOpen, setIsMessageComposerOpen] = useState(false);
   const [lightboxState, setLightboxState] = useState({ kind: "", index: -1 });
   const [connectionsView, setConnectionsView] = useState(null);
   const noticeTimeoutRef = useRef(null);
@@ -364,7 +366,7 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        showNotice("error", payload?.error || "Failed to update follow state.");
+        showNotice("error", payload?.error || "failed to update follow state.");
         return;
       }
 
@@ -374,6 +376,19 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
     } finally {
       setIsUpdatingFollow(false);
     }
+  };
+
+  const handleOpenMessageComposer = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      showNotice("error", "sign in to message artists.");
+      return;
+    }
+
+    setIsMessageComposerOpen(true);
   };
 
   const openVisualLightbox = (itemId) => {
@@ -665,6 +680,8 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
               isFollowing={isFollowing}
               isUpdatingFollow={isUpdatingFollow}
               onFollowToggle={handleFollowToggle}
+              isMessagingAvailable={canFollow}
+              onMessageProfile={handleOpenMessageComposer}
               headerTopRight={
                 isViewerAdmin && !isOwnProfile && !profile.isAdmin ? (
                   <motion.button
@@ -729,6 +746,22 @@ export function PublicProfilePage({ profile, items, likedTracks }) {
                 onClose={() => setConnectionsView(null)}
               />
             ) : null}
+
+            <AnimatePresence>
+              {isMessageComposerOpen ? (
+                <MessageComposer
+                  isOpen={isMessageComposerOpen}
+                  recipient={{
+                    userId: profile.userId,
+                    username: profile.username,
+                    displayName: profile.displayName,
+                    avatarUrl: profile.avatarUrl,
+                  }}
+                  onClose={() => setIsMessageComposerOpen(false)}
+                  onSent={() => showNotice("success", "message sent.")}
+                />
+              ) : null}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

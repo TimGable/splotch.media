@@ -23,6 +23,14 @@ import {
   SOFT_BUTTON_TAP,
 } from "@/lib/motion";
 
+const HOME_BUTTON_HOVER = {
+  ...SOFT_BUTTON_HOVER,
+  transition: {
+    ...SOFT_BUTTON_HOVER.transition,
+    duration: 0.12,
+  },
+};
+
 export function LandingPage({ onSignIn, onForgotPassword }) {
   const router = useRouter();
   const [showCategories, setShowCategories] = useState(false);
@@ -111,8 +119,15 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
       return;
     }
 
-    viewHistoryRef.current = getRootViewHistorySeed(initialView);
-    navigateLanding(initialView, { recordHistory: false });
+    const timeoutId = window.setTimeout(() => {
+      viewHistoryRef.current = getRootViewHistorySeed(initialView);
+      navigateLanding(initialView, { recordHistory: false });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -268,7 +283,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                       onHoverEnd={() => {
                         if (supportsHoverMotion) setHoveredButton(null);
                       }}
-                      whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
+                      whileHover={supportsHoverMotion ? HOME_BUTTON_HOVER : undefined}
                       whileTap={SOFT_BUTTON_TAP}
                     >
                       <motion.div 
@@ -300,7 +315,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                       <motion.button 
                         className="group relative flex h-14 w-full max-w-[22rem] items-center justify-center overflow-hidden border border-white/40 bg-white/5 px-5 transition-all duration-200 hover:border-white/60 hover:bg-white/15 active:scale-95 touch-manipulation md:h-[5.25rem] md:w-[16rem] md:max-w-none md:px-7"
                         onClick={() => navigateLanding("sign-in")}
-                        whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
+                        whileHover={supportsHoverMotion ? HOME_BUTTON_HOVER : undefined}
                         whileTap={SOFT_BUTTON_TAP}
                       >
                         <span className="relative z-10 whitespace-nowrap text-base tracking-wide text-white md:text-lg">
@@ -317,7 +332,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                       <motion.button 
                         className="group relative flex h-14 w-full max-w-[22rem] items-center justify-center overflow-hidden border border-white/40 bg-white/5 px-5 transition-all duration-200 hover:border-white/60 hover:bg-white/15 active:scale-95 touch-manipulation md:h-[5.25rem] md:w-[16rem] md:max-w-none md:px-7"
                         onClick={() => navigateLanding("request-invite")}
-                        whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
+                        whileHover={supportsHoverMotion ? HOME_BUTTON_HOVER : undefined}
                         whileTap={SOFT_BUTTON_TAP}
                       >
                         <span className="relative z-10 whitespace-nowrap text-base tracking-wide text-white md:text-lg">
@@ -340,7 +355,7 @@ export function LandingPage({ onSignIn, onForgotPassword }) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ ...PAGE_TRANSITION, delay: 0.32 }}
-                        whileHover={supportsHoverMotion ? SOFT_BUTTON_HOVER : undefined}
+                        whileHover={supportsHoverMotion ? HOME_BUTTON_HOVER : undefined}
                         whileTap={SOFT_BUTTON_TAP}
                       >
                         <span className="relative z-10 text-xs tracking-wide text-gray-400 transition-colors group-hover:text-white md:text-sm md:tracking-widest">

@@ -216,18 +216,18 @@ export function MediaItemPage({
                     ) : null}
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-4">
                       <motion.button
                         type="button"
                         onClick={() => onPlayPause(item)}
                         disabled={!item.asset?.url}
-                        className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.03] transition-colors hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-2.5 flex h-14 w-14 flex-shrink-0 items-center justify-center justify-self-center rounded-full border border-white/20 bg-white/[0.03] transition-colors hover:border-white/50 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
                         whileTap={{ scale: 0.94 }}
                       >
                         {isPlaying && isActive ? (
                           <Pause className="h-5 w-5" />
                         ) : (
-                          <Play className="ml-0.5 h-5 w-5" />
+                          <Play className="h-5 w-5 translate-x-px" />
                         )}
                       </motion.button>
 
