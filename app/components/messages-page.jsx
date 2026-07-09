@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, MessageSquare, Search, Send, UserPlus, X } from "lucide-react";
+import { ArrowLeft, MessageSquare, MoreHorizontal, Search, Send, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createSupabaseBrowserClient,
@@ -12,6 +12,22 @@ import { buildPublicProfilePath } from "@/lib/media-slugs";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
 import { ViewportPortal } from "./viewport-portal";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { ScrollArea } from "./ui/scroll-area";
 import { Textarea } from "./ui/textarea";
 
@@ -344,6 +360,8 @@ export function MessagesPage() {
   const [error, setError] = useState("");
   const [hasCheckedConversations, setHasCheckedConversations] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState(null);
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [newMessageAnchorRect, setNewMessageAnchorRect] = useState(null);
 
@@ -575,6 +593,63 @@ export function MessagesPage() {
     }
   };
 
+  const deleteConversation = async () => {
+    if (!conversationToDelete?.id || isDeletingConversation) {
+      return;
+    }
+
+    if (conversationToDelete.isTemporary) {
+      removeTemporaryConversation(conversationToDelete.id);
+      setConversationToDelete(null);
+      return;
+    }
+
+    setIsDeletingConversation(true);
+    setError("");
+
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        setError("sign in to delete conversations.");
+        return;
+      }
+
+      // Deletion is a participant-level hide, not a shared thread deletion.
+      // The other user keeps their conversation exactly as it was.
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          action: "delete-conversation",
+          conversationId: conversationToDelete.id,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(payload?.error || "failed to delete conversation.");
+        return;
+      }
+
+      setConversations(Array.isArray(payload?.conversations) ? payload.conversations : []);
+      setMessages([]);
+      setHasCheckedConversations(true);
+
+      if (activeConversationId === conversationToDelete.id) {
+        setActiveConversationId("");
+        setDraft("");
+        router.replace("/messages", { scroll: false });
+      }
+
+      setConversationToDelete(null);
+    } finally {
+      setIsDeletingConversation(false);
+    }
+  };
+
   const sendReply = async () => {
     const body = draft.trim();
     if (!activeConversationId || !body || isSending) {
@@ -696,31 +771,61 @@ export function MessagesPage() {
                   transition={MESSAGE_SURFACE_TRANSITION}
                   className="overflow-hidden border-b border-white/10"
                 >
-                  <motion.button
-                    type="button"
-                    onClick={() => openConversation(conversation.id)}
-                    className={`grid w-full grid-cols-[3rem_minmax(0,1fr)_4.75rem] items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-white/[0.04] ${
+                  <div
+                    className={`grid w-full grid-cols-[minmax(0,1fr)_2.25rem] gap-3 px-4 py-4 transition-colors hover:bg-white/[0.04] ${
                       conversation.id === activeConversationId ? "bg-white/[0.06]" : ""
                     }`}
-                    whileTap={SOFT_BUTTON_TAP}
                   >
-                    <ConversationAvatar conversation={conversation} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-white">{getParticipantName(conversation)}</p>
-                      <p className={`mt-1 line-clamp-2 text-xs ${
-                        conversation.isUnread ? "text-gray-300" : "text-gray-500"
-                      }`}>
-                        {conversation.lastMessage?.isOwn ? "you: " : ""}
-                        {conversation.lastMessage?.body || "no messages yet."}
-                      </p>
-                      {conversation.participant?.username ? (
-                        <p className="mt-2 truncate text-[11px] text-gray-600">@{conversation.participant.username}</p>
-                      ) : null}
+                    <motion.button
+                      type="button"
+                      onClick={() => openConversation(conversation.id)}
+                      className="grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-start gap-3 text-left"
+                      whileTap={SOFT_BUTTON_TAP}
+                    >
+                      <ConversationAvatar conversation={conversation} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-white">{getParticipantName(conversation)}</p>
+                        <p className={`mt-1 line-clamp-2 text-xs ${
+                          conversation.isUnread ? "text-gray-300" : "text-gray-500"
+                        }`}>
+                          {conversation.lastMessage?.isOwn ? "you: " : ""}
+                          {conversation.lastMessage?.body || "no messages yet."}
+                        </p>
+                        {conversation.participant?.username ? (
+                          <p className="mt-2 truncate text-[11px] text-gray-600">@{conversation.participant.username}</p>
+                        ) : null}
+                      </div>
+                    </motion.button>
+
+                    <div className="flex min-h-full flex-col items-end justify-between gap-3">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex h-8 w-8 items-center justify-center border border-white/10 text-gray-500 transition-colors hover:border-white/35 hover:text-white"
+                            aria-label={`open conversation options for ${getParticipantName(conversation)}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="min-w-[13.5rem] border-white/15 bg-black text-white"
+                        >
+                          <DropdownMenuItem
+                            onSelect={() => setConversationToDelete(conversation)}
+                            className="gap-2.5 whitespace-nowrap px-3 py-2 text-red-300 focus:bg-red-500/10 focus:text-red-200"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-300" />
+                            <span>delete conversation</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-gray-600">
+                        {conversation.isTemporary ? "draft" : conversation.updatedAtLabel}
+                      </span>
                     </div>
-                    <span className="justify-self-end whitespace-nowrap pt-0.5 text-[10px] uppercase tracking-[0.14em] text-gray-600">
-                      {conversation.isTemporary ? "draft" : conversation.updatedAtLabel}
-                    </span>
-                  </motion.button>
+                  </div>
                 </motion.div>
               ))}
             </motion.div>
@@ -842,6 +947,42 @@ export function MessagesPage() {
           )}
         </section>
       </div>
+
+      <AlertDialog
+        open={Boolean(conversationToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingConversation) {
+            setConversationToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="rounded-none border-white/15 bg-black text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-normal">delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-relaxed text-gray-400">
+              this only removes the conversation from your inbox. it will not delete the conversation for the other user.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeletingConversation}
+              className="rounded-none border-white/20 bg-transparent text-gray-300 hover:border-white/40 hover:bg-white/5 hover:text-white"
+            >
+              cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingConversation}
+              onClick={(event) => {
+                event.preventDefault();
+                deleteConversation();
+              }}
+              className="rounded-none border border-red-400/45 bg-red-500/10 text-red-200 hover:bg-red-500/15"
+            >
+              {isDeletingConversation ? "deleting..." : "delete conversation"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

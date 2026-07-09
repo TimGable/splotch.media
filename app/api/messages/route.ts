@@ -11,12 +11,18 @@ const CONVERSATION_LIMIT = 40;
 const MESSAGE_LIMIT = 80;
 const MAX_MESSAGE_LENGTH = 2000;
 const MESSAGE_SCHEMA_ERROR =
-  "Messaging tables are not available yet. Apply db/migrations/2026-07-09_user_messages.sql to Supabase, then reload the schema cache.";
+  "Messaging tables are not available yet. Apply the messaging migrations in db/migrations to Supabase, then reload the schema cache.";
 
 type ConversationRow = {
   id: string;
   last_message_at: string;
   created_at: string;
+};
+
+type ConversationParticipantRow = {
+  conversation_id: string;
+  last_read_at?: string | null;
+  hidden_at?: string | null;
 };
 
 function formatRelativeTime(value: string) {
@@ -47,7 +53,8 @@ function isMissingMessagingSchemaError(error: unknown) {
   return (
     message.includes("message_conversation_participants") ||
     message.includes("message_conversations") ||
-    message.includes("public.messages")
+    message.includes("public.messages") ||
+    message.includes("hidden_at")
   ) && message.toLowerCase().includes("schema cache");
 }
 
@@ -67,7 +74,7 @@ async function ensureConversationParticipant(
 ) {
   const { data, error } = await supabase
     .from("message_conversation_participants")
-    .select("conversation_id")
+    .select("conversation_id, hidden_at")
     .eq("conversation_id", conversationId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -77,6 +84,25 @@ async function ensureConversationParticipant(
   }
 
   return Boolean(data);
+}
+
+async function getConversationParticipant(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  conversationId: string,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("message_conversation_participants")
+    .select("conversation_id, hidden_at")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as ConversationParticipantRow | null;
 }
 
 async function findDirectConversation(
@@ -152,7 +178,7 @@ async function buildConversations(
   // joined from that bounded set so private threads do not leak across users.
   const { data: participantRows, error: participantError } = await supabase
     .from("message_conversation_participants")
-    .select("conversation_id, last_read_at")
+    .select("conversation_id, last_read_at, hidden_at")
     .eq("user_id", userId);
 
   if (participantError) {
@@ -174,8 +200,7 @@ async function buildConversations(
       .from("message_conversations")
       .select("id, last_message_at, created_at")
       .in("id", conversationIds)
-      .order("last_message_at", { ascending: false })
-      .limit(CONVERSATION_LIMIT),
+      .order("last_message_at", { ascending: false }),
     supabase
       .from("message_conversation_participants")
       .select("conversation_id, user_id")
@@ -192,9 +217,11 @@ async function buildConversations(
   if (latestMessagesError) throw new Error(latestMessagesError.message);
 
   const orderedConversations = (conversations ?? []) as ConversationRow[];
-  const visibleConversationIds = orderedConversations.map((entry) => entry.id);
   const ownReadAtByConversationId = new Map(
     ownParticipants.map((row) => [row.conversation_id, row.last_read_at as string | null]),
+  );
+  const ownHiddenAtByConversationId = new Map(
+    ownParticipants.map((row) => [row.conversation_id, row.hidden_at as string | null]),
   );
   const latestMessageByConversationId = new Map<string, {
     id: string;
@@ -204,10 +231,23 @@ async function buildConversations(
   }>();
 
   for (const message of latestMessages ?? []) {
+    const hiddenAt = ownHiddenAtByConversationId.get(message.conversation_id);
+    if (hiddenAt && new Date(message.created_at).getTime() <= new Date(hiddenAt).getTime()) {
+      continue;
+    }
+
     if (!latestMessageByConversationId.has(message.conversation_id)) {
       latestMessageByConversationId.set(message.conversation_id, message);
     }
   }
+
+  // Deleting a conversation is per-user: it hides everything up to hidden_at
+  // for this participant, while newer messages can revive the thread later.
+  const visibleConversations = orderedConversations.filter((conversation) => {
+    const hiddenAt = ownHiddenAtByConversationId.get(conversation.id);
+    return !hiddenAt || latestMessageByConversationId.has(conversation.id);
+  });
+  const visibleConversationIds = visibleConversations.map((entry) => entry.id);
 
   const otherUserIds = [
     ...new Set(
@@ -261,7 +301,7 @@ async function buildConversations(
   }
 
   let unreadCount = 0;
-  const items = orderedConversations.map((conversation) => {
+  const items = visibleConversations.slice(0, CONVERSATION_LIMIT).map((conversation) => {
     const latestMessage = latestMessageByConversationId.get(conversation.id);
     const ownReadAt = ownReadAtByConversationId.get(conversation.id);
     const isUnread = Boolean(
@@ -310,17 +350,23 @@ async function buildThread(
   userId: string,
 ) {
   // Service role bypasses RLS, so keep the membership check close to the read.
-  const isParticipant = await ensureConversationParticipant(supabase, conversationId, userId);
-  if (!isParticipant) {
+  const participant = await getConversationParticipant(supabase, conversationId, userId);
+  if (!participant) {
     return null;
   }
 
-  const { data: messages, error: messagesError } = await supabase
+  let messageQuery = supabase
     .from("messages")
     .select("id, sender_user_id, body, created_at")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true })
     .limit(MESSAGE_LIMIT);
+
+  if (participant.hidden_at) {
+    messageQuery = messageQuery.gt("created_at", participant.hidden_at);
+  }
+
+  const { data: messages, error: messagesError } = await messageQuery;
 
   if (messagesError) {
     throw new Error(messagesError.message);
@@ -404,6 +450,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ...response });
     }
 
+    if (action === "delete-conversation") {
+      const conversationId = String(body?.conversationId || "").trim();
+      if (!conversationId) {
+        return NextResponse.json({ error: "Conversation is required." }, { status: 400 });
+      }
+
+      const participant = await getConversationParticipant(supabase, conversationId, userId);
+      if (!participant) {
+        return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+      }
+
+      const hiddenAt = new Date().toISOString();
+      const { error } = await supabase
+        .from("message_conversation_participants")
+        .update({ hidden_at: hiddenAt, last_read_at: hiddenAt })
+        .eq("conversation_id", conversationId)
+        .eq("user_id", userId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      const response = await buildConversations(supabase, userId);
+      return NextResponse.json({ ok: true, activeConversationId: "", messages: [], ...response });
+    }
+
     const messageBody = cleanMessageBody(body?.body);
     if (!messageBody) {
       return NextResponse.json({ error: "Message cannot be empty." }, { status: 400 });
@@ -466,7 +538,7 @@ export async function POST(request: Request) {
 
     await supabase
       .from("message_conversation_participants")
-      .update({ last_read_at: message.created_at })
+      .update({ last_read_at: message.created_at, hidden_at: null })
       .eq("conversation_id", conversationId)
       .eq("user_id", userId);
 

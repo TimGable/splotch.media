@@ -258,12 +258,16 @@ CREATE TABLE IF NOT EXISTS message_conversation_participants (
   conversation_id UUID NOT NULL REFERENCES message_conversations(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   last_read_at TIMESTAMPTZ,
+  hidden_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (conversation_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_message_participants_user
   ON message_conversation_participants (user_id, conversation_id);
+
+CREATE INDEX IF NOT EXISTS idx_message_participants_user_hidden
+  ON message_conversation_participants (user_id, hidden_at, conversation_id);
 
 CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
