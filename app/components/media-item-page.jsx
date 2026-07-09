@@ -87,6 +87,8 @@ export function MediaItemPage({
   formatFileSize,
   formatReleaseType,
 }) {
+  // Generated bars are only a fallback while the exact decoded waveform loads,
+  // but seeding them keeps the page from jittering between renders.
   const waveformData = buildWaveformData(`${item.id}:${item.asset?.fileName || item.title}`);
   const progress = duration > 0 ? currentTime / duration : 0;
   const displayTitle = getMediaDisplayTitle(item);

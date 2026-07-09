@@ -84,6 +84,8 @@ async function findDirectConversation(
   firstUserId: string,
   secondUserId: string,
 ) {
+  // Direct messages are one thread per pair of users. Find the overlap instead
+  // of trusting a client-supplied conversation id.
   const { data: firstRows, error: firstError } = await supabase
     .from("message_conversation_participants")
     .select("conversation_id")
@@ -116,6 +118,8 @@ async function createDirectConversation(
   firstUserId: string,
   secondUserId: string,
 ) {
+  // The API owns conversation creation so browser clients never need direct
+  // insert access to the messaging tables.
   const { data: conversation, error: conversationError } = await supabase
     .from("message_conversations")
     .insert({})
@@ -144,6 +148,8 @@ async function buildConversations(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
   userId: string,
 ) {
+  // Build the inbox from the user's participant rows first; everything else is
+  // joined from that bounded set so private threads do not leak across users.
   const { data: participantRows, error: participantError } = await supabase
     .from("message_conversation_participants")
     .select("conversation_id, last_read_at")
@@ -303,6 +309,7 @@ async function buildThread(
   conversationId: string,
   userId: string,
 ) {
+  // Service role bypasses RLS, so keep the membership check close to the read.
   const isParticipant = await ensureConversationParticipant(supabase, conversationId, userId);
   if (!isParticipant) {
     return null;
@@ -405,6 +412,8 @@ export async function POST(request: Request) {
     let conversationId = String(body?.conversationId || "").trim();
     const recipientUserId = String(body?.recipientUserId || "").trim();
 
+    // A send is either into a thread the user already belongs to, or it starts
+    // a direct thread with a real recipient. No mystery third option, thankfully.
     if (conversationId) {
       const isParticipant = await ensureConversationParticipant(supabase, conversationId, userId);
       if (!isParticipant) {

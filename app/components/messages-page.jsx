@@ -8,6 +8,7 @@ import {
   createSupabaseBrowserClient,
   getStoredSupabaseAccessToken,
 } from "@/lib/supabase/client";
+import { buildPublicProfilePath } from "@/lib/media-slugs";
 import { PAGE_TRANSITION, SOFT_BUTTON_HOVER, SOFT_BUTTON_TAP, SOFT_PANEL_REVEAL } from "@/lib/motion";
 import { ViewportPortal } from "./viewport-portal";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -25,14 +26,19 @@ const MESSAGE_SURFACE_REVEAL = {
   exit: { opacity: 0, y: -8, scale: 0.992, filter: "blur(8px)" },
 };
 const THREAD_FADE_REVEAL = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 },
+  initial: { opacity: 0, filter: "blur(8px)" },
+  animate: { opacity: 1, filter: "blur(0px)" },
+  exit: { opacity: 0, filter: "blur(6px)" },
 };
 const CONVERSATION_FADE_REVEAL = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 },
+  initial: { opacity: 0, filter: "blur(8px)" },
+  animate: { opacity: 1, filter: "blur(0px)" },
+  exit: { opacity: 0, filter: "blur(6px)" },
+};
+const COMPOSER_FADE_REVEAL = {
+  initial: { opacity: 0, filter: "blur(8px)", scale: 0.992 },
+  animate: { opacity: 1, filter: "blur(0px)", scale: 1 },
+  exit: { opacity: 0, filter: "blur(6px)", scale: 0.996 },
 };
 const MESSAGE_ITEM_REVEAL = {
   initial: { opacity: 0, y: 10, filter: "blur(7px)" },
@@ -259,15 +265,10 @@ function NewMessagePanel({
                   <motion.div
                     key="searching"
                     layout
-                    className="flex w-full min-w-0 items-center gap-3 overflow-hidden border-b border-white/10 px-3 py-3 text-sm text-gray-500"
+                    className="flex w-full min-w-0 items-center overflow-hidden border-b border-white/10 px-3 py-3 text-sm text-gray-500"
                     {...MESSAGE_ITEM_REVEAL}
                     transition={MESSAGE_SURFACE_TRANSITION}
                   >
-                    <motion.span
-                      className="h-2 w-2 border border-white/35 bg-white/20"
-                      animate={{ opacity: [0.35, 1, 0.35], scale: [0.75, 1, 0.75] }}
-                      transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                    />
                     <span className="min-w-0 truncate">searching...</span>
                   </motion.div>
                 ) : null}
@@ -341,6 +342,7 @@ export function MessagesPage() {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  const [hasCheckedConversations, setHasCheckedConversations] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [newMessageAnchorRect, setNewMessageAnchorRect] = useState(null);
@@ -412,6 +414,7 @@ export function MessagesPage() {
         }
 
         const nextConversations = Array.isArray(payload?.conversations) ? payload.conversations : [];
+        setHasCheckedConversations(true);
         setConversations((current) => {
           const temporaryConversation = current.find((conversation) => conversation.isTemporary);
           if (!temporaryConversation) {
@@ -486,6 +489,17 @@ export function MessagesPage() {
     router.replace("/messages", { scroll: false });
   };
 
+  const openParticipantProfile = (conversation) => {
+    const username = conversation?.participant?.username;
+    if (!username) {
+      return;
+    }
+
+    // The conversation header doubles as a quiet profile shortcut, so users can
+    // move from a message thread back to the artist page without hunting around.
+    router.push(buildPublicProfilePath(username));
+  };
+
   const openNewMessagePanel = () => {
     const rect = newMessageButtonRef.current?.getBoundingClientRect();
     setNewMessageAnchorRect(
@@ -514,6 +528,8 @@ export function MessagesPage() {
       return;
     }
 
+    // Add a local-only draft row so choosing a recipient feels instant. The API
+    // creates the real conversation only after the first message is sent.
     const temporaryId = `temporary-${user.userId}`;
     const temporaryConversation = {
       id: temporaryId,
@@ -604,6 +620,8 @@ export function MessagesPage() {
       setConversations(Array.isArray(payload?.conversations) ? payload.conversations : []);
       setMessages(Array.isArray(payload?.messages) ? payload.messages : []);
 
+      // Temporary conversations get swapped for the server-created id after the
+      // first send, keeping the URL shareable once the thread actually exists.
       if (activeConversation?.isTemporary && payload?.conversationId) {
         setActiveConversationId(payload.conversationId);
         router.replace(`/messages?conversationId=${encodeURIComponent(payload.conversationId)}`, { scroll: false });
@@ -674,9 +692,8 @@ export function MessagesPage() {
               {conversations.map((conversation) => (
                 <motion.div
                   key={conversation.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+                  {...CONVERSATION_FADE_REVEAL}
+                  transition={MESSAGE_SURFACE_TRANSITION}
                   className="overflow-hidden border-b border-white/10"
                 >
                   <motion.button
@@ -707,7 +724,7 @@ export function MessagesPage() {
                 </motion.div>
               ))}
             </motion.div>
-          ) : (
+          ) : hasCheckedConversations ? (
             <motion.div
               className="px-4 py-10 text-sm text-gray-500"
               {...CONVERSATION_FADE_REVEAL}
@@ -715,7 +732,7 @@ export function MessagesPage() {
             >
               no messages yet. start a conversation with the new message button.
             </motion.div>
-          )}
+          ) : null}
         </section>
 
         <section
@@ -734,13 +751,23 @@ export function MessagesPage() {
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <ConversationAvatar conversation={activeConversation} size="h-11 w-11" />
-                <div className="min-w-0">
-                  <p className="truncate text-base text-white">{getParticipantName(activeConversation)}</p>
-                  {activeConversation.participant?.username ? (
-                    <p className="truncate text-xs text-gray-500">@{activeConversation.participant.username}</p>
-                  ) : null}
-                </div>
+                <motion.button
+                  type="button"
+                  onClick={() => openParticipantProfile(activeConversation)}
+                  disabled={!activeConversation.participant?.username}
+                  className="flex min-w-0 items-center gap-3 text-left transition-opacity hover:opacity-85 disabled:cursor-default disabled:hover:opacity-100"
+                  whileHover={activeConversation.participant?.username ? SOFT_BUTTON_HOVER : undefined}
+                  whileTap={activeConversation.participant?.username ? SOFT_BUTTON_TAP : undefined}
+                  aria-label={`open ${getParticipantName(activeConversation)} profile`}
+                >
+                  <ConversationAvatar conversation={activeConversation} size="h-11 w-11" />
+                  <div className="min-w-0">
+                    <p className="truncate text-base text-white">{getParticipantName(activeConversation)}</p>
+                    {activeConversation.participant?.username ? (
+                      <p className="truncate text-xs text-gray-500">@{activeConversation.participant.username}</p>
+                    ) : null}
+                  </div>
+                </motion.button>
                 {activeConversation.isTemporary ? (
                   <button
                     type="button"
@@ -774,7 +801,12 @@ export function MessagesPage() {
                 </div>
               </ScrollArea>
 
-              <div className="border-t border-white/10 p-4 md:p-5">
+              <motion.div
+                key={`composer-${activeConversation.id}`}
+                className="border-t border-white/10 p-4 md:p-5"
+                {...COMPOSER_FADE_REVEAL}
+                transition={MESSAGE_SURFACE_TRANSITION}
+              >
                 <Textarea
                   value={draft}
                   onChange={(event) => setDraft(event.target.value.slice(0, MAX_MESSAGE_LENGTH))}
@@ -795,7 +827,7 @@ export function MessagesPage() {
                     <span>{isSending ? "sending..." : "send"}</span>
                   </motion.button>
                 </div>
-              </div>
+              </motion.div>
             </>
           ) : (
             <div className="flex flex-1 items-center justify-center p-8 text-center">

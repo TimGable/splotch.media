@@ -22,6 +22,7 @@ export async function getAuthContext(request: Request): Promise<AuthContext | nu
   const token = extractBearerToken(request);
   if (!token) return null;
 
+  // Trust Supabase auth for identity, then map it into our app-owned user table below.
   const authClient = createSupabaseServerClient();
   const { data, error } = await authClient.auth.getUser(token);
 
@@ -36,6 +37,8 @@ export async function getAuthContext(request: Request): Promise<AuthContext | nu
 export async function ensureAppUser(authUserId: string, email: string) {
   const supabase = createSupabaseServiceRoleClient();
 
+  // Auth users and app users can be created at different moments, so this keeps
+  // the two records linked without silently taking over someone else's email.
   const { data: byAuthUser, error: byAuthUserError } = await supabase
     .from("users")
     .select("id, email, is_admin, is_moderator")
@@ -159,6 +162,7 @@ function toBaseUsername(email: string) {
 export async function ensureProfile(userId: string, email: string) {
   const supabase = createSupabaseServiceRoleClient();
 
+  // Profiles are created lazily so invite/account creation can stay focused on auth.
   const { data: existing, error: fetchError } = await supabase
     .from("profiles")
     .select("user_id, username, display_name, bio")

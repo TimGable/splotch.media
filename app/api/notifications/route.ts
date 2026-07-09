@@ -72,6 +72,8 @@ export async function GET(request: Request) {
     await ensureProfile(userId, auth.email);
 
     const supabase = createSupabaseServiceRoleClient();
+    // Notifications need actor avatars and media links, so fetch the compact
+    // notification list first and hydrate only the records it references.
     const [{ data: notifications, error: notificationsError }, { count: unreadCount, error: unreadError }] =
       await Promise.all([
         supabase

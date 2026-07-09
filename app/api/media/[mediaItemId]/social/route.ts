@@ -59,6 +59,8 @@ async function resolveAccess(request: Request, mediaItemId: string): Promise<Acc
   const auth = await getAuthContext(request);
   let currentUserId: string | null = null;
 
+  // Social data follows the same visibility rules as the media item itself.
+  // Owners can see their own work; everyone else needs a public/unlisted item.
   if (auth) {
     const ensuredUser = await ensureAppUser(auth.authUserId, auth.email);
     await ensureProfile(ensuredUser.userId, auth.email);
@@ -99,6 +101,8 @@ async function buildSocialPayload(
   mediaItemId: string,
   currentUserId: string | null,
 ) {
+  // Keep the panel cheap to render by fetching counts, the current user's like,
+  // and visible comments in one pass.
   const [
     { count: likeCount, error: likeCountError },
     { count: commentCount, error: commentCountError },

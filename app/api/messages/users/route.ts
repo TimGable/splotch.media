@@ -75,6 +75,8 @@ export async function GET(request: Request) {
     const followingIds = new Set((followingRows ?? []).map((row) => row.artist_user_id).filter(Boolean));
     const followerIds = new Set((followerRows ?? []).map((row) => row.follower_user_id).filter(Boolean));
 
+    // Search broadly, then rank locally so follows/followers feel close at hand
+    // without hiding the rest of the artist directory.
     let profileQuery = supabase
       .from("profiles")
       .select("user_id, username, display_name, bio, avatar_asset_id")

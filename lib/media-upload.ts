@@ -172,6 +172,8 @@ export async function buildMediaItemResponse(
     trackNumber?: number | null;
   },
 ) {
+  // A media item is mostly metadata; the playable/viewable file lives in
+  // storage and is attached as a short-lived signed URL here.
   const { data: assets, error: assetsError } = await supabase
     .from("media_assets")
     .select("id, media_item_id, role, bucket, object_key, file_name, mime_type, file_size_bytes")

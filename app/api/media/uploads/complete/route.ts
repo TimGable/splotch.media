@@ -73,6 +73,8 @@ async function assertUploadedObjectExists(asset: CompletedUploadAsset) {
   const supabase = createSupabaseServiceRoleClient();
   const parentPath = asset.objectKey.split("/").slice(0, -1).join("/");
   const fileName = asset.objectKey.split("/").pop();
+  // Direct uploads happen before this request, so completion verifies storage
+  // before trusting client-provided asset ids and metadata.
   const { data, error } = await supabase.storage.from(asset.bucket).list(parentPath, {
     limit: 100,
     search: fileName,
@@ -217,6 +219,8 @@ export async function POST(request: Request) {
       let collectionId: string | null = null;
 
       if (mediaKind === "music" && releaseType !== "single") {
+        // Albums and EPs share one collection row while each track stays its own
+        // media item for playback, likes, comments, and queue behavior.
         collectionId = crypto.randomUUID();
         const publishedAt = visibility === "private" ? null : new Date().toISOString();
         const { error: collectionInsertError } = await supabase.from("media_collections").insert({
@@ -377,6 +381,8 @@ export async function POST(request: Request) {
           });
         }
       } catch (notificationError) {
+        // The upload should survive a notification hiccup; losing the art over a
+        // mention would be a deeply uncool plot twist.
         console.error("Failed to create media mention notifications:", notificationError);
       }
 
@@ -385,6 +391,8 @@ export async function POST(request: Request) {
         { status: 201 },
       );
     } catch (creationError) {
+      // Mirror the cleanup used by server-side uploads: storage and database
+      // writes are separate systems, so roll back what this request created.
       for (const mediaItemId of createdMediaItemIds) {
         await supabase.from("media_items").delete().eq("id", mediaItemId);
       }

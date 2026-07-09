@@ -12,6 +12,8 @@ function getWaveformCacheKey(audioUrl, sampleCount) {
 
   try {
     const parsedUrl = new URL(audioUrl);
+    // Signed URLs rotate, but the storage path is stable. Cache by path so a
+    // track viewed once can reuse its decoded peaks on the next signed URL.
     return `${parsedUrl.origin}${parsedUrl.pathname}::${sampleCount}`;
   } catch {
     return `${audioUrl.split("?")[0]}::${sampleCount}`;
@@ -89,6 +91,8 @@ async function loadWaveformPeaks(audioUrl, sampleCount) {
   }
 
   const pending = (async () => {
+    // The first exact waveform costs an audio decode in the browser; after that
+    // the small normalized peak array is cached and reused.
     const response = await fetch(audioUrl);
     if (!response.ok) {
       throw new Error("Failed to load audio for waveform.");
